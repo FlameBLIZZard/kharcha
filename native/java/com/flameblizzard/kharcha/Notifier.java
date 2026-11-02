@@ -94,7 +94,10 @@ final class Notifier {
         } catch (SecurityException | java.io.UnsupportedEncodingException ignored) { }
     }
 
-    /** Always-there "Add expense" entry in the notification shade. Shown whenever the listener connects (also after reboot). */
+    /**
+     * Always-there entry in the notification shade. Pull down, type "120 chai", send: the category popup appears.
+     * Nothing is read from other apps, so BHIM has nothing to object to.
+     */
     static void showQuickAdd(Context c) {
         try {
             if (Build.VERSION.SDK_INT >= 26) {
@@ -105,14 +108,19 @@ final class Notifier {
             Intent open = new Intent(c, MainActivity.class).setAction(Intent.ACTION_VIEW).setData(Uri.parse("kharcha://add"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             PendingIntent tap = PendingIntent.getActivity(c, 7, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+            androidx.core.app.RemoteInput ri = new androidx.core.app.RemoteInput.Builder("amt").setLabel("Amount and what for, e.g. 120 chai").build();
+            Intent quick = new Intent(c, ActionReceiver.class).setAction("com.flameblizzard.kharcha.quick").putExtra("what", "quick");
+            PendingIntent quickPi = PendingIntent.getBroadcast(c, 8, quick,
+                PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0));
             NotificationCompat.Builder b = new NotificationCompat.Builder(c, "kharcha_quick")
                 .setSmallIcon(android.R.drawable.ic_menu_add)
                 .setContentTitle("Kharcha")
-                .setContentText("Tap to add an expense")
+                .setContentText("Just paid? Type the amount")
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .setShowWhen(false)
-                .setContentIntent(tap);
+                .setContentIntent(tap)
+                .addAction(new NotificationCompat.Action.Builder(0, "\u20b9 Add", quickPi).addRemoteInput(ri).setAllowGeneratedReplies(false).build());
             NotificationManagerCompat nm = NotificationManagerCompat.from(c);
             if (nm.areNotificationsEnabled()) nm.notify(7, b.build());
         } catch (SecurityException ignored) { }

@@ -22,16 +22,8 @@ public class KharchaNativePlugin extends Plugin {
         JSObject o = new JSObject();
         o.put("listener", NotificationManagerCompat.getEnabledListenerPackages(c).contains(c.getPackageName()));
         o.put("notifications", NotificationManagerCompat.from(c).areNotificationsEnabled());
-        String enabled = Settings.Secure.getString(c.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         o.put("overlay", android.os.Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(c));
-        o.put("screen", enabled != null && enabled.contains(c.getPackageName() + "/"));
         call.resolve(o);
-    }
-
-    @PluginMethod
-    public void openScreenReaderSettings(PluginCall call) {
-        start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-        call.resolve();
     }
 
     @PluginMethod
@@ -39,13 +31,6 @@ public class KharchaNativePlugin extends Plugin {
         JSArray a = call.getArray("cats");
         if (a != null) Store.setCats(getContext(), a.toString());
         call.resolve();
-    }
-
-    @PluginMethod
-    public void lastScreen(PluginCall call) {
-        JSObject o = new JSObject();
-        o.put("text", Store.lastScreen(getContext()));
-        call.resolve(o);
     }
 
     @PluginMethod

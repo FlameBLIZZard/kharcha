@@ -13,8 +13,23 @@ import org.json.JSONObject;
 public class ActionReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
-        int id = i.getIntExtra("id", 0);
         String what = i.getStringExtra("what");
+        if ("quick".equals(what)) {
+            try {
+                Bundle rr = RemoteInput.getResultsFromIntent(i);
+                CharSequence typed = rr == null ? null : rr.getCharSequence("amt");
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)").matcher(typed == null ? "" : typed.toString());
+                if (m.find()) {
+                    double a = Double.parseDouble(m.group(1).replace(",", ""));
+                    String rest = typed.toString().replace(m.group(1), "").replace("\u20b9", "").replace("Rs", "").replace("rs", "").trim();
+                    String name = Detector.pretty(rest);
+                    Notifier.show(c, a, name, Detector.guess(rest));
+                }
+            } catch (Exception ignored) { }
+            Notifier.showQuickAdd(c);
+            return;
+        }
+        int id = i.getIntExtra("id", 0);
         String amt = i.getStringExtra("amt");
         String merchant = i.getStringExtra("merchant");
         if (merchant == null) merchant = "";

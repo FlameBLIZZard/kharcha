@@ -10,6 +10,7 @@ const cases = [
   ['INR 560.50 spent on ICICI Bank Card XX9876 on 02-Nov-26 at SWIGGY. Avl Lmt: INR 45,000', 560.5, 'Swiggy', 'debit'],
   ['Your A/c XX1234 is credited with Rs 5000.00 on 01-11-26 by NEFT', 5000, '', 'credit'],
   ['Payment of Rs 199 to Netflix successful', 199, 'Netflix', 'debit'],
+  ['Dear UPI user A/C X1234 debited by 1.0 on date 02Nov26 trf to MOM Refno 123456789012. If not u? call 1800111109. -SBI', 1, 'Mom', 'debit'],
   ['Your OTP is 123456 for txn of Rs 500. Do not share', 0, '', 'otp'],
 ];
 let ok = 0;

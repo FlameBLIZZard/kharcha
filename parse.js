@@ -3,11 +3,13 @@
 (function (root) {
   const AMT = /(?:rs\.?|inr|₹|rupees)\s*:?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i;
   const AMT_AFTER = /([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:rs\.?|inr|₹|rupees)\b/i;
+  const AMT_BY = /\b(?:debited|paid|sent|transferred)\s+(?:by|for|with|of)\s+(?:rs\.?|inr|₹)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i;
   const DEBIT = /\b(debited|debit|spent|paid|sent|withdrawn|purchase|payment of|txn of|transferred|dr\.?)\b/i;
   const CREDIT = /\b(credited|received|refund|cashback|deposited|cr\.?)\b/i;
   const NOISE = /\b(otp|one time password|verification code|do not share)\b/i;
 
   const MERCHANT_PATTERNS = [
+    /\btrf\s+to\s+([^\n]+?)(?=\s+ref\s*no|\s+refno|\s+ref\b|[.,\n]|$)/i,
     /\bpaid\s+(?:rs\.?|inr|₹)?\s*[0-9,.]*\s*to\s+([^\n.,]+?)(?=\s+(?:on|via|using|from|ref|upi|txn|for|avl|bal)\b|[.,\n]|$)/i,
     /\b(?:to|towards)\s+(?:vpa\s+|a\/c\s+)?([^\n.,]+?)(?=\s+(?:on|via|using|from|ref|upi|txn|avl|bal|is|has|successful|success|done|completed|failed)\b|[.,\n]|$)/i,
     /\b(?:at|@)\s+([^\n.,]+?)(?=\s+(?:on|via|using|from|ref|txn|avl|bal)\b|[.,\n]|$)/i,
@@ -32,7 +34,7 @@
     if (!text) return out;
     text = String(text).replace(/ /g, ' ');
     if (NOISE.test(text)) { out.kind = 'otp'; return out; }
-    const m = text.match(AMT) || text.match(AMT_AFTER);
+    const m = text.match(AMT) || text.match(AMT_AFTER) || text.match(AMT_BY);
     if (m) out.amount = Math.round(parseFloat(m[1].replace(/,/g, '')) * 100) / 100;
     const d = DEBIT.test(text), c = CREDIT.test(text);
     out.kind = d && !/\bcredited to your\b/i.test(text) ? 'debit' : c ? 'credit' : d ? 'debit' : 'unknown';
@@ -40,7 +42,7 @@
     if (/debited/i.test(text)) out.kind = 'debit';
     for (const re of MERCHANT_PATTERNS) {
       const mm = text.match(re);
-      if (mm) { const name = cleanMerchant(mm[1]); if (name && !/^(your|a\/c|account|ac|you)\b/i.test(name)) { out.merchant = name; break; } }
+      if (mm) { const name = cleanMerchant(mm[1]); if (name && !/^(your|a\/c|account|ac|you|no)\b/i.test(name)) { out.merchant = name; break; } }
     }
     return out;
   }

@@ -31,7 +31,7 @@ import org.json.JSONObject;
 
 /**
  * The floating "what was that for?" card that appears on top of whatever app you are in.
- * Uses "Display over other apps" if granted, otherwise the accessibility screen reader's overlay window.
+ * Uses the "Display over other apps" permission. Without it, the popup is a notification instead.
  */
 final class Overlay {
     private static final Handler H = new Handler(Looper.getMainLooper());
@@ -39,7 +39,7 @@ final class Overlay {
     private static WindowManager currentWm;
 
     static boolean canShow(Context app) {
-        return (Build.VERSION.SDK_INT >= 23 && Settings.canDrawOverlays(app)) || PayWatcher.instance != null;
+        return Build.VERSION.SDK_INT >= 23 && Settings.canDrawOverlays(app);
     }
 
     /** Returns true if an overlay will be shown (so the notification can stay quiet). */
@@ -49,9 +49,6 @@ final class Overlay {
         if (Build.VERSION.SDK_INT >= 23 && Settings.canDrawOverlays(app)) {
             wctx = app;
             type = Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-        } else if (PayWatcher.instance != null && Build.VERSION.SDK_INT >= 22) {
-            wctx = PayWatcher.instance;
-            type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
         } else {
             return false;
         }

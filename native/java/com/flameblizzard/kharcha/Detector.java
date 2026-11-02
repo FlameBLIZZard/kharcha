@@ -8,11 +8,13 @@ import java.util.regex.Pattern;
 final class Detector {
     private static final Pattern AMT = Pattern.compile("(?i)(?:rs\\.?|inr|₹|rupees)\\s*:?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)");
     private static final Pattern AMT_AFTER = Pattern.compile("(?i)([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*(?:rs\\.?|inr|₹|rupees)\\b");
+    private static final Pattern AMT_BY = Pattern.compile("(?i)\\b(?:debited|paid|sent|transferred)\\s+(?:by|for|with|of)\\s+(?:rs\\.?|inr|\u20b9)?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)");
     private static final Pattern DEBIT = Pattern.compile("(?i)\\b(debited|spent|paid|sent|withdrawn|purchase|payment of|txn of|transferred)\\b");
     private static final Pattern CREDIT = Pattern.compile("(?i)\\b(credited|received|refund|cashback|deposited)\\b");
     private static final Pattern NOISE = Pattern.compile("(?i)\\b(otp|one time password|verification code|do not share|requested|request money|collect request|will be debited|failed|declined|unsuccessful)\\b");
     private static final String STOP = "(?=\\s+(?:on|via|using|from|ref|upi|txn|avl|bal|is|has|successful|success|done|completed)\\b|[.,\\n]|$)";
     private static final Pattern[] MERCHANT = {
+        Pattern.compile("(?i)\\btrf\\s+to\\s+([^\\n]+?)(?=\\s+ref\\s*no|\\s+refno|\\s+ref\\b|[.,\\n]|$)"),
         Pattern.compile("(?i)\\bpaid\\s+(?:rs\\.?|inr|₹)?\\s*[0-9,.]*\\s*to\\s+([^\\n.,]+?)" + STOP),
         Pattern.compile("(?i)\\b(?:to|towards)\\s+(?:vpa\\s+|a/c\\s+)?([^\\n.,]+?)" + STOP),
         Pattern.compile("(?i)\\b(?:at|@)\\s+([^\\n.,]+?)" + STOP),
@@ -43,7 +45,7 @@ final class Detector {
             if (n.contains("@")) n = n.split("@")[0].split("[._-]")[0];
             n = n.replaceAll("(?i)^(mr|ms|mrs|m/s)\\.?\\s+", "").trim();
             if (n.length() > 32) n = n.substring(0, 32).trim();
-            if (n.isEmpty() || n.matches("(?i)[x*\\d\\s]+") || n.matches("(?i)^(your|a/c|account|ac|you)\\b.*")) continue;
+            if (n.isEmpty() || n.matches("(?i)[x*\\d\\s]+") || n.matches("(?i)^(your|a/c|account|ac|you|no)\\b.*")) continue;
             StringBuilder b = new StringBuilder();
             for (String w : n.split(" ")) if (!w.isEmpty()) b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1).toLowerCase()).append(' ');
             return b.toString().trim();
@@ -60,7 +62,7 @@ final class Detector {
         if (!debit) return false;
         if (CREDIT.matcher(text).find() && !Pattern.compile("(?i)\\bdebited\\b").matcher(text).find()) return false;
         Matcher m = AMT.matcher(text);
-        if (!m.find()) { m = AMT_AFTER.matcher(text); if (!m.find()) return false; }
+        if (!m.find()) { m = AMT_AFTER.matcher(text); if (!m.find()) { m = AMT_BY.matcher(text); if (!m.find()) return false; } }
         double amt;
         try { amt = Double.parseDouble(m.group(1).replace(",", "")); } catch (Exception e) { return false; }
         if (amt <= 0) return false;
@@ -70,46 +72,7 @@ final class Detector {
         return true;
     }
 
-    // ---- Reading a UPI app's "payment successful" screen (AccessibilityService) ----
-    private static final Pattern SCREEN_OK = Pattern.compile("(?i)\\b(payment\\s+successful|paid\\s+successfully|payment\\s+done|payment\\s+completed|money\\s+sent|sent\\s+successfully|transaction\\s+successful|successfully\\s+(?:paid|sent|transferred)|transfer\\s+successful|paid\\s+to)\\b");
-    private static final Pattern SCREEN_BAD = Pattern.compile("(?i)\\b(failed|declined|pending|processing|enter\\s+(?:upi\\s+)?pin|request(?:ed)?\\s+(?:from|money)|received\\s+from|credited)\\b");
-    private static final Pattern SCREEN_AMT = Pattern.compile("(?i)(?:\u20b9|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)");
-    private static final Pattern TO_LABEL = Pattern.compile("(?i)^(paid to|sent to|to|paying to|transferred to|payment to)\\s*:?$");
-    private static final Pattern TO_INLINE = Pattern.compile("(?i)^(?:paid|sent|payment|transferred)\\s+(?:successfully\\s+)?to\\s+(.+)$");
-
-    /** Takes all text on a UPI app screen. Returns true if it was a successful payment and a popup was shown. */
-    static boolean handleScreen(Context c, java.util.List<String> nodes) {
-        if (nodes == null || nodes.isEmpty()) return false;
-        StringBuilder all = new StringBuilder();
-        for (String n : nodes) all.append(n).append('\n');
-        String joined = all.toString();
-        if (!SCREEN_OK.matcher(joined).find()) return false;
-        Store.setLastScreen(c, joined.replace("\n", " | "));
-        if (SCREEN_BAD.matcher(joined).find()) return false;
-        double amt = 0;
-        for (String n : nodes) {
-            Matcher m = SCREEN_AMT.matcher(n);
-            if (m.find()) { try { amt = Double.parseDouble(m.group(1).replace(",", "")); } catch (Exception e) { amt = 0; } if (amt > 0) break; }
-        }
-        if (amt <= 0) return false;
-        String name = "", vpa = "";
-        for (int i = 0; i < nodes.size() && name.isEmpty(); i++) {
-            String n = nodes.get(i).trim();
-            Matcher in = TO_INLINE.matcher(n);
-            if (in.find()) name = pretty(in.group(1));
-            else if (TO_LABEL.matcher(n).find() && i + 1 < nodes.size()) {
-                String nx = nodes.get(i + 1).trim();
-                if (nx.contains("@")) vpa = nx; else name = pretty(nx);
-            }
-        }
-        if (name.isEmpty()) for (String n : nodes) if (n.matches("(?i)^[a-z0-9._-]{2,}@[a-z]{2,}$")) { vpa = n; break; }
-        if (name.isEmpty() && !vpa.isEmpty()) name = pretty(vpa.split("@")[0].split("[._-]")[0]);
-        if (Store.isDuplicate(c, amt)) return false;
-        Notifier.show(c, amt, name, guess(name + " " + joined));
-        return true;
-    }
-
-    private static String pretty(String raw) {
+    static String pretty(String raw) {
         String n = raw == null ? "" : raw.replaceAll("\\s+", " ").trim();
         if (n.length() > 32) n = n.substring(0, 32).trim();
         if (n.isEmpty() || n.matches("(?i)[x*\\d\\s]+") || n.contains("\u20b9")) return "";
