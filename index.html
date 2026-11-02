@@ -149,6 +149,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .92em; backgro
 .confetti i { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; animation: fall 1.6s ease-in forwards; }
 @keyframes fall { to { transform: translateY(105vh) rotate(720deg); opacity: .5; } }
 .day { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--mute); font-weight: 600; display: flex; justify-content: space-between; margin: 22px 4px 8px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin: 0 -18px; padding-left: 18px; padding-right: 18px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip.sel { background: var(--ink); color: var(--bg); }
 .week { display: flex; gap: 8px; height: 96px; margin-top: 16px; }
 .week .d { flex: 1; display: grid; grid-template-rows: 1fr auto; gap: 6px; min-width: 0; }
 .week .track { display: flex; align-items: flex-end; }
@@ -195,7 +198,7 @@ const DEFAULT_CATS = [
 ];
 function freshState() {
   return { v: 1, created: Date.now(), settings: { name: '', income: 0, saveTarget: 0, startDay: 1, currency: '₹', theme: 'dark', onboarded: false, bestStreak: 0 },
-    cats: DEFAULT_CATS.map(c => ({ ...c })), tx: [], goals: [], saves: [] };
+    cats: DEFAULT_CATS.map(c => ({ ...c })), tx: [], goals: [], saves: [], subs: [] };
 }
 function load() {
   try {
@@ -263,6 +266,41 @@ function confetti() {
 }
 
 /* ---------- money maths ---------- */
+/* ---------- recurring subscriptions ---------- */
+const monthKey = d => d.getFullYear() + '-' + (d.getMonth() + 1);
+const dueDate = (sub, ref) => new Date(ref.getFullYear(), ref.getMonth(), Math.min(sub.day, new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate()), 9, 0);
+function runSubs() {
+  if (!Array.isArray(S.subs)) S.subs = [];
+  let n = 0; const now = new Date();
+  S.subs.forEach(sub => {
+    const due = dueDate(sub, now), key = monthKey(now);
+    if (sub.last === key || +now < +due) return;
+    sub.last = key;
+    if (!S.tx.some(t => t.id === 'sub-' + sub.id + '-' + key)) { S.tx.push({ id: 'sub-' + sub.id + '-' + key, amt: sub.amt, cat: sub.cat || 'subscriptions', note: sub.name, mode: 'UPI', ts: +due, src: 'recurring' }); n++; }
+  });
+  if (n) { save(); setTimeout(() => toast(n + ' subscription' + (n > 1 ? 's' : '') + ' logged for this month'), 600); }
+}
+function upcomingSubs(days = 7) {
+  const now = new Date(), out = [];
+  (S.subs || []).forEach(sub => {
+    let due = dueDate(sub, now);
+    if (sub.last === monthKey(now) || +due < +startOfDay(now)) due = dueDate(sub, new Date(now.getFullYear(), now.getMonth() + 1, 1));
+    const left = Math.ceil((+due - +startOfDay(now)) / DAY);
+    if (left >= 0 && left <= days) out.push({ ...sub, due, left });
+  });
+  return out.sort((a, b) => a.left - b.left);
+}
+function subForm(sub) {
+  const isNew = !sub; sub = sub || { id: uid(), name: '', amt: '', day: new Date().getDate(), cat: 'subscriptions' };
+  openSheet(`<h3 style="margin:4px 0 6px">${isNew ? 'New subscription' : 'Edit subscription'}</h3>
+    <p class="small muted" style="margin-top:0">Kharcha logs it for you on its day every month, so you don't have to.</p>
+    <div class="field"><label>Name</label><input id="s-name" value="${esc(sub.name)}" placeholder="e.g. Netflix, Spotify, iCloud"></div>
+    <div class="two"><div class="field"><label>Amount</label><input id="s-amt" type="number" inputmode="decimal" value="${sub.amt}"></div>
+    <div class="field"><label>Day of month</label><select id="s-day">${Array.from({ length: 31 }, (_, i) => `<option ${sub.day == i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select></div></div>
+    <div class="field"><label>Category</label><select id="s-cat">${S.cats.map(c => `<option value="${c.id}" ${c.id === sub.cat ? 'selected' : ''}>${c.emoji} ${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="actions">${isNew ? `<button class="btn" data-act="close">Cancel</button>` : `<button class="btn danger" data-act="subdel" data-id="${sub.id}">Delete</button>`}<button class="btn primary" data-act="subsave" data-id="${sub.id}">Save</button></div>`);
+}
+
 function calc() {
   const p = period(), now = Date.now(), today = +startOfDay(now);
   const txP = S.tx.filter(t => inRange(t.ts, p.start, p.end));
@@ -337,7 +375,7 @@ function countUps() {
 }
 
 /* ---------- routing / render ---------- */
-let tab = 'home', histFilter = 'all', histQuery = '';
+let tab = 'home', histFilter = 'all', histQuery = '', histCat = '';
 function go(t) { tab = t; render(true); window.scrollTo(0, 0); }
 function render(enter) {
   document.documentElement.dataset.theme = S.settings.theme || 'dark';
@@ -397,6 +435,12 @@ function viewHome() {
       <div class="small muted">${money(sv)} of ${money(g.target)} · ${Math.round(pct)}%</div></div></div><div class="bar thin"><i style="width:${pct}%"></i></div></button>`;
   }
 
+  const soon = upcomingSubs(7);
+  if (soon.length) h += `<h2>Coming up</h2><div class="card list">${soon.map(x => `<button class="item" data-act="subedit" data-id="${x.id}"><div class="emoji">${catById(x.cat).emoji}</div><div class="grow"><div class="bold ellipsis">${esc(x.name)}</div><div class="small muted">${x.left === 0 ? 'Today' : x.left === 1 ? 'Tomorrow' : 'In ' + x.left + ' days'}</div></div><div class="bold num">${money(x.amt)}</div></button>`).join('')}</div>`;
+  if (IS_APP && KN) {
+    const on = [nat.listener, nat.notifications, nat.overlay].filter(Boolean).length;
+    if (on < 3) h += `<button class="card savefirst" style="display:block;width:100%;text-align:left" data-tab="settings"><div class="row"><div class="emoji">🔔</div><div class="grow"><div class="bold">Finish auto-detect setup</div><div class="small muted">${on} of 3 switches are on. Tap to turn on the rest so payments pop up on their own.</div></div></div></button>`;
+  }
   h += `<div class="tip"><span class="gs">💡</span> ${esc(tipOfDay())}</div>`;
 
   // last 7 days
@@ -406,6 +450,11 @@ function viewHome() {
   if (wk) {
     const mx = Math.max(...days.map(x => x.v), 1);
     h += `<h2>Last 7 days</h2><div class="card"><div class="row"><div class="grow bold">${money(wk, { dec: false })}</div><div class="small muted">avg ${money(wk / 7, { dec: false })} a day</div></div>
+      ${(() => { const p = period(), pp = period(new Date(+p.start - DAY)); const elapsed = Math.max(1, Math.ceil((Date.now() - +p.start) / DAY));
+        const cur = sum(S.tx.filter(t => inRange(t.ts, p.start, new Date(+p.start + elapsed * DAY))).map(t => t.amt));
+        const prev = sum(S.tx.filter(t => inRange(t.ts, pp.start, new Date(+pp.start + elapsed * DAY))).map(t => t.amt));
+        if (!prev) return ''; const diff = cur - prev;
+        return `<div class="small muted" style="margin-top:8px">${diff <= 0 ? money(-diff, { dec: false }) + ' less' : money(diff, { dec: false }) + ' more'} than this time last month</div>`; })()}
       <div class="week" role="img" aria-label="Spending per day for the last 7 days">${days.map((x, i) => `<div class="d ${i === 6 ? 'today' : ''}"><div class="track"><div class="b" style="height:${Math.max(4, x.v / mx * 100)}%;animation-delay:${i * 50}ms"></div></div><div class="l">${i === 6 ? 'Today' : x.d.toLocaleDateString('en-IN', { weekday: 'narrow' })}</div></div>`).join('')}</div></div>`;
   }
 
@@ -445,10 +494,14 @@ function viewHistory() {
   if (histFilter === 'month') list = list.filter(t => inRange(t.ts, p.start, p.end));
   if (histFilter === 'week') list = list.filter(t => t.ts >= Date.now() - 7 * DAY);
   if (histQuery) { const q = histQuery.toLowerCase(); list = list.filter(t => (t.note || '').toLowerCase().includes(q) || catById(t.cat).name.toLowerCase().includes(q) || String(t.amt).includes(q)); }
+  const catIds = [...new Set(list.map(t => t.cat))];
+  if (histCat && !catIds.includes(histCat)) histCat = '';
+  const chips = catIds.length > 1 ? `<div class="chips">${[['', 'All']].concat(catIds.map(id => [id, catById(id).emoji + ' ' + catById(id).name])).map(([k, l]) => `<button class="chip ${histCat === k ? 'sel' : ''}" data-hcat="${esc(k)}">${esc(l)}</button>`).join('')}</div>` : '';
+  if (histCat) list = list.filter(t => t.cat === histCat);
   list.sort((a, b) => b.ts - a.ts);
   let h = `<div class="top"><div class="hi">History</div><span class="chip">${money(sum(list.map(t => t.amt)))}</span></div>
     <div class="seg">${[['all', 'All'], ['month', 'This month'], ['week', '7 days']].map(([k, l]) => `<button data-hist="${k}" class="${histFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <input type="search" id="histq" placeholder="Search notes, categories, amounts" value="${esc(histQuery)}" style="margin-bottom:6px">`;
+    <input type="search" id="histq" placeholder="Search notes, categories, amounts" value="${esc(histQuery)}" style="margin-bottom:10px">${chips}`;
   if (!list.length) return h + `<div class="empty">Nothing here yet.</div>`;
   let cur = '', group = [];
   const flush = () => { if (group.length) h += `<div class="day"><span>${relDay(group[0].ts)}</span><span>${money(sum(group.map(t => t.amt)))}</span></div><div class="card list">${group.map(txRow).join('')}</div>`; group = []; };
@@ -531,6 +584,8 @@ function viewSettings() {
     <div class="field"><label>Currency symbol</label><input data-set="currency" value="${esc(st.currency)}" maxlength="4"></div></div>
     <div class="small muted">${st.income ? `You can spend ${money(Math.max(0, st.income - st.saveTarget), { dec: false })} a month, about ${money(Math.max(0, st.income - st.saveTarget) / period().days, { dec: false })} a day. Saving ${st.income ? Math.round(st.saveTarget / st.income * 100) : 0}% of income.` : 'Add your income to unlock the daily safe-to-spend number.'}</div>
   </div>
+  <h2>Subscriptions</h2><div class="card list">${(S.subs || []).map(x => `<button class="item" data-act="subedit" data-id="${x.id}"><div class="emoji">${catById(x.cat).emoji}</div><div class="grow"><div class="bold ellipsis">${esc(x.name)}</div><div class="small muted">Every month on the ${x.day}${['th','st','nd','rd'][(x.day % 10 > 3 || [11, 12, 13].includes(x.day)) ? 0 : x.day % 10]}</div></div><div class="bold num">${money(x.amt)}</div></button>`).join('')}
+    <div class="item"><button class="btn block" data-act="subnew">＋ Add a subscription</button></div></div>
   <h2>Categories and budgets</h2><div class="small muted" style="margin:-4px 4px 10px">Use ↑ to move your favourites to the top. The payment popup offers them first.</div><div class="card list">${S.cats.map(ct => `<div class="item"><div class="emoji">${ct.emoji}</div><div class="grow bold">${esc(ct.name)}</div><input data-catbudget="${ct.id}" type="number" inputmode="decimal" value="${ct.budget || ''}" placeholder="No limit" style="width:120px;text-align:right"><button class="btn ghost" data-act="catup" data-id="${ct.id}" aria-label="Move up" title="Move up (popup buttons follow this order)">↑</button><button class="btn ghost" data-act="catedit" data-id="${ct.id}" aria-label="Edit category">✎</button></div>`).join('')}
     <div class="item"><button class="btn block" data-act="catnew">＋ Add a category</button></div></div>
 
@@ -785,7 +840,7 @@ async function nativeSync() {
     syncCats();
     nat = await KN.status();
     if (nat.notifications) KN.showQuickAdd().catch(() => {});
-    if (tab === 'settings' && !draft) render();
+    if ((tab === 'settings' || tab === 'home') && !draft) render();
   } catch (e) {}
 }
 
@@ -796,6 +851,7 @@ document.addEventListener('click', e => {
   if (t.dataset.key) { tick(); padKey(t.dataset.key); return; }
   if (t.dataset.cat && draft) { tick(10); syncDraftInputs(); draft.cat = draft.cat === t.dataset.cat ? '' : t.dataset.cat; renderAdd(); return; }
   if (t.dataset.mode && draft) { syncDraftInputs(); draft.mode = t.dataset.mode; renderAdd(); return; }
+  if (t.dataset.hcat !== undefined) { histCat = t.dataset.hcat; render(); return; }
   if (t.dataset.hist) { histFilter = t.dataset.hist; render(); return; }
   if (t.dataset.themeBtn) { S.settings.theme = t.dataset.themeBtn; save(); render(); return; }
   if (t.dataset.pct) { onbRead(); onb.save = String(Math.round((+onb.income || 0) * t.dataset.pct / 100)); renderOnboarding(); return; }
@@ -855,6 +911,18 @@ document.addEventListener('click', e => {
       Object.assign(ct, { name, emoji: $('#c-emoji').value.trim() || '🏷️', budget: +$('#c-budget').value || 0 });
       save(); syncCats(); closeSheet(); render(); break;
     }
+    case 'subnew': subForm(); break;
+    case 'subedit': subForm(S.subs.find(x => x.id === id)); break;
+    case 'subsave': {
+      const name = $('#s-name').value.trim(), amt = +$('#s-amt').value;
+      if (!name || !amt) { toast('Give it a name and an amount'); break; }
+      let sub = S.subs.find(x => x.id === id); const fresh = !sub;
+      if (!sub) { sub = { id }; S.subs.push(sub); }
+      Object.assign(sub, { name, amt, day: +$('#s-day').value, cat: $('#s-cat').value });
+      if (fresh) sub.last = dueDate(sub, new Date()) <= new Date() ? monthKey(new Date()) : '';   // no backfill for a day already gone this month
+      save(); closeSheet(); render(); break;
+    }
+    case 'subdel': S.subs = S.subs.filter(x => x.id !== id); save(); closeSheet(); render(); toast('Removed'); break;
     case 'catdel': if (confirm('Delete this category? Its expenses move to Other.')) { S.tx.forEach(x => { if (x.cat === id) x.cat = 'other'; }); S.cats = S.cats.filter(c => c.id !== id); save(); syncCats(); closeSheet(); render(); } break;
     case 'natlisten': KN && KN.openAccessSettings(); break;
     case 'natoverlay': KN && KN.openOverlaySettings(); break;
@@ -894,8 +962,9 @@ document.addEventListener('keydown', e => {
 })();
 window.addEventListener('hashchange', () => { if (location.hash.startsWith('#add')) handleIncoming(); });
 // refresh numbers when the app comes back to the front (day may have changed)
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); render(); nativeSync(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); runSubs(); render(); nativeSync(); } });
 
+runSubs();
 render();
 handleIncoming();
 // Android app: kharcha://add?text=... from MacroDroid
