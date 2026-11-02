@@ -101,9 +101,14 @@ final class Notifier {
     static void showQuickAdd(Context c) {
         try {
             if (Build.VERSION.SDK_INT >= 26) {
-                NotificationChannel ch = new NotificationChannel("kharcha_quick", "Quick add", NotificationManager.IMPORTANCE_LOW);
+                NotificationManager nmgr = c.getSystemService(NotificationManager.class);
+                nmgr.deleteNotificationChannel("kharcha_quick");   // old LOW channel: Samsung filed it under "Silent"
+                NotificationChannel ch = new NotificationChannel("kharcha_quick2", "Quick add", NotificationManager.IMPORTANCE_DEFAULT);
                 ch.setDescription("A permanent shortcut to add an expense");
-                c.getSystemService(NotificationManager.class).createNotificationChannel(ch);
+                ch.setSound(null, null);
+                ch.enableVibration(false);
+                ch.setShowBadge(false);
+                nmgr.createNotificationChannel(ch);
             }
             Intent open = new Intent(c, MainActivity.class).setAction(Intent.ACTION_VIEW).setData(Uri.parse("kharcha://add"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -112,11 +117,16 @@ final class Notifier {
             Intent quick = new Intent(c, ActionReceiver.class).setAction("com.flameblizzard.kharcha.quick").putExtra("what", "quick");
             PendingIntent quickPi = PendingIntent.getBroadcast(c, 8, quick,
                 PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0));
-            NotificationCompat.Builder b = new NotificationCompat.Builder(c, "kharcha_quick")
+            Intent gone = new Intent(c, ActionReceiver.class).setAction("com.flameblizzard.kharcha.requick").putExtra("what", "requick");
+            PendingIntent gonePi = PendingIntent.getBroadcast(c, 9, gone, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+            NotificationCompat.Builder b = new NotificationCompat.Builder(c, "kharcha_quick2")
                 .setSmallIcon(android.R.drawable.ic_menu_add)
                 .setContentTitle("Kharcha")
                 .setContentText("Just paid? Type the amount")
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setDefaults(0)
+                .setOnlyAlertOnce(true)
+                .setDeleteIntent(gonePi)
                 .setOngoing(true)
                 .setShowWhen(false)
                 .setContentIntent(tap)

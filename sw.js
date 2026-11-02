@@ -1,6 +1,6 @@
 // Kharcha service worker: cache the app shell so it opens offline and instantly.
-const CACHE = 'kharcha-v2';
-const SHELL = ['./', 'index.html', 'parse.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'fonts/inter.woff2'];
+const CACHE = 'kharcha-v3';
+const SHELL = ['./', 'index.html', 'parse.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'fonts/inter.woff2', 'fonts/fraunces-italic.woff2', 'fonts/space-grotesk.woff2', 'fonts/jetbrains-mono.woff2'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

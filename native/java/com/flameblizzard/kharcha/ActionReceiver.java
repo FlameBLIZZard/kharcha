@@ -14,6 +14,7 @@ public class ActionReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
         String what = i.getStringExtra("what");
+        if ("requick".equals(what)) { Notifier.showQuickAdd(c); return; }   // the quick-add notification was swiped away
         if ("quick".equals(what)) {
             try {
                 Bundle rr = RemoteInput.getResultsFromIntent(i);
@@ -23,6 +24,7 @@ public class ActionReceiver extends BroadcastReceiver {
                     double a = Double.parseDouble(m.group(1).replace(",", ""));
                     String rest = typed.toString().replace(m.group(1), "").replace("\u20b9", "").replace("Rs", "").replace("rs", "").trim();
                     String name = Detector.pretty(rest);
+                    Store.isDuplicate(c, a);   // so the bank SMS for this same payment does not pop up a second time
                     Notifier.show(c, a, name, Detector.guess(rest));
                 }
             } catch (Exception ignored) { }
