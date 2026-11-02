@@ -2,6 +2,8 @@ package com.flameblizzard.kharcha;
 
 import android.app.Notification;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 
@@ -9,6 +11,19 @@ import android.service.notification.StatusBarNotification;
 public class TxListener extends NotificationListenerService {
     @Override
     public void onListenerConnected() { Notifier.showQuickAdd(getApplicationContext()); }
+
+    /** "Clear all" can remove even pinned notifications on Android 14, so put the quick-add one straight back. */
+    @Override
+    public void onNotificationRemoved(StatusBarNotification sbn) {
+        try {
+            if (sbn != null && getPackageName().equals(sbn.getPackageName()) && sbn.getId() == 7) {
+                final android.content.Context app = getApplicationContext();
+                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override public void run() { Notifier.showQuickAdd(app); }
+                }, 800);
+            }
+        } catch (Exception ignored) { }
+    }
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
