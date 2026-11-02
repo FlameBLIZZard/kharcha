@@ -78,6 +78,39 @@ public class KharchaNativePlugin extends Plugin {
         call.resolve();
     }
 
+    /** Saves a text file (backup JSON or CSV) into Downloads/Kharcha. WebViews cannot do blob downloads. */
+    @PluginMethod
+    public void saveText(PluginCall call) {
+        String name = call.getString("name", "kharcha.txt");
+        String text = call.getString("text", "");
+        String mime = call.getString("mime", "text/plain");
+        Context c = getContext();
+        try {
+            JSObject o = new JSObject();
+            if (Build.VERSION.SDK_INT >= 29) {
+                android.content.ContentValues v = new android.content.ContentValues();
+                v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name);
+                v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime);
+                v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Kharcha");
+                android.net.Uri uri = c.getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) throw new Exception("could not create the file");
+                java.io.OutputStream os = c.getContentResolver().openOutputStream(uri);
+                try { os.write(text.getBytes("UTF-8")); } finally { os.close(); }
+                o.put("where", "Downloads/Kharcha");
+            } else {
+                Intent s = new Intent(Intent.ACTION_SEND);
+                s.setType("text/plain");
+                s.putExtra(Intent.EXTRA_SUBJECT, name);
+                s.putExtra(Intent.EXTRA_TEXT, text);
+                start(Intent.createChooser(s, "Save " + name));
+                o.put("where", "the share sheet");
+            }
+            call.resolve(o);
+        } catch (Exception e) {
+            call.reject("Could not save the file: " + e.getMessage());
+        }
+    }
+
     private void start(Intent i) {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try { getContext().startActivity(i); } catch (Exception ignored) { }

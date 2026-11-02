@@ -460,6 +460,7 @@ function viewHome() {
     const on = [nat.listener, nat.notifications, nat.overlay].filter(Boolean).length;
     if (on < 3) h += `<button class="card savefirst" style="display:block;width:100%;text-align:left" data-tab="settings"><div class="row"><div class="emoji">🔔</div><div class="grow"><div class="bold">Finish auto-detect setup</div><div class="small muted">${on} of 3 switches are on. Tap to turn on the rest so payments pop up on their own.</div></div></div></button>`;
   }
+  if (S.tx.length >= 15 && Date.now() - (S.settings.lastBackup || S.created || 0) > 14 * DAY) h += `<button class="card" style="display:block;width:100%;text-align:left" data-act="export"><div class="row"><div class="emoji">💾</div><div class="grow"><div class="bold">Back up your data</div><div class="small muted">Your expenses live only on this phone. Tap to save a backup file to Downloads.</div></div></div></button>`;
   h += `<div class="tip"><span class="gs">💡</span> ${esc(tipOfDay())}</div>`;
 
   // last 7 days
@@ -872,6 +873,10 @@ function catForm(ct, back) {
 
 /* ---------- import / export ---------- */
 function download(name, text, type) {
+  if (typeof KN !== 'undefined' && KN && KN.saveText) {   // the Android app: WebViews cannot download blobs
+    KN.saveText({ name, text, mime: type }).then(r => toast('Saved to ' + (r.where || 'Downloads') + ' as ' + name, 4200)).catch(() => toast('Could not save the file'));
+    return;
+  }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
@@ -1043,7 +1048,7 @@ document.addEventListener('click', e => {
     case 'nattest': KN && (nat.notifications ? KN.test().then(() => toast('Check your notifications')) : toast('Allow popups first')); break;
     case 'copyurl': { const u = appUrl(); (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('Copied. Paste it in MacroDroid.'), () => prompt('Copy this URL', u)); break; }
     case 'smstest': { const v = $('#smstest').value.trim(); if (!v) { toast('Paste an SMS first'); break; } location.hash = '#add?text=' + encodeURIComponent(v); break; }
-    case 'export': download('kharcha-backup-' + new Date().toLocaleDateString('en-CA') + '.json', JSON.stringify(S), 'application/json'); break;
+    case 'export': S.settings.lastBackup = Date.now(); save(); download('kharcha-backup-' + new Date().toLocaleDateString('en-CA') + '.json', JSON.stringify(S), 'application/json'); break;
     case 'import': importJson(); break;
     case 'csv': exportCsv(); break;
     case 'reset': if (confirm('Erase all expenses, goals and settings on this phone?') && confirm('Really? This cannot be undone.')) { localStorage.removeItem(KEY); S = freshState(); onb = { step: 0, name: '', income: '', save: '', goal: '', goalTarget: '' }; render(); } break;
