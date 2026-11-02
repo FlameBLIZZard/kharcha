@@ -21,7 +21,7 @@
 }
 :root[data-theme="light"] {
   --bg: #fff; --panel: #f6f6f6; --panel-2: #ececec; --line: #e2e2e2;
-  --ink: #000; --mute: #767676; --accent: #000; --accent-ink: #fff; --warn: #4a4a4a; --bad: #000; --blue: #000; color-scheme: light;
+  --ink: #000; --mute: #666; --accent: #000; --accent-ink: #fff; --warn: #4a4a4a; --bad: #000; --blue: #000; color-scheme: light;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
@@ -51,6 +51,11 @@ button.card:active { transform: scale(.975); }
 .hero { padding: 26px 22px 22px; background: var(--ink); color: var(--bg); border: 0; }
 .hero .label, .hero .line, .hero .muted { color: color-mix(in srgb, var(--bg) 55%, var(--ink)); }
 .hero .label { font-size: 11px; text-transform: uppercase; letter-spacing: .16em; font-weight: 600; }
+.hero.over { background: var(--bg); color: var(--ink); border: 2px solid var(--ink); }
+.hero.over .label, .hero.over .line, .hero.over .muted { color: var(--mute); }
+.hero.over .bar { background: var(--panel-2); }
+.hero.over .bar > i { background: var(--ink); }
+.hero.over .bar.bad > i { background: repeating-linear-gradient(135deg, var(--ink) 0 5px, transparent 5px 9px); outline-color: var(--ink); }
 .hero .big { font-size: 64px; font-weight: 700; letter-spacing: -.055em; line-height: 1; margin: 10px 0 8px; font-variant-numeric: tabular-nums; }
 .hero .line { font-size: 13px; }
 .hero .bar { background: color-mix(in srgb, var(--bg) 18%, var(--ink)); }
@@ -353,14 +358,14 @@ function viewHome() {
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const name = S.settings.name ? ', ' + esc(S.settings.name) : '';
   let h = `<div class="top"><div><div class="hi">${hello}${name}</div><div class="sub">${c.p.start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} to ${new Date(+c.p.end - DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${c.daysLeft} day${c.daysLeft > 1 ? 's' : ''} left</div></div>
-    <span class="chip fire" title="${st.mode === 'budget' ? 'Days in a row under your daily budget' : 'Days in a row you logged something'}"><span class="gs">🔥</span> ${st.n}</span></div>`;
+    <span class="chip fire" title="${st.mode === 'budget' ? 'Days in a row under your daily budget' : 'Days in a row you logged something'}"><span class="gs">🔥</span> ${st.n}-day streak</span></div>`;
 
   // hero
   if (c.income) {
     const pct = c.spendable ? Math.min(100, c.spent / c.spendable * 100) : 100;
     const cls = pct > 90 ? 'bad' : pct > 70 ? 'warn' : '';
     const neg = c.leftToday < 0;
-    h += `<div class="card hero"><div class="label">${neg ? 'Over today\'s budget by' : 'Safe to spend today'}</div>
+    h += `<div class="card hero${neg ? ' over' : ''}"><div class="label">${neg ? 'Over today\'s budget by' : 'Safe to spend today'}</div>
       <div class="big" data-count="${Math.round(Math.abs(c.leftToday))}">${money(Math.abs(c.leftToday), { dec: false })}</div>
       <div class="line">${neg ? 'Spend nothing more today and tomorrow\'s budget recovers.' : c.spentToday ? `Spent ${money(c.spentToday)} today of ${money(Math.max(0, c.allowToday), { dec: false })}` : 'Nothing spent yet today. Nice.'}</div>
       <div class="bar ${cls}"><i style="width:${pct}%"></i></div>
@@ -508,10 +513,10 @@ function nativeCard() {
     <div class="bold" style="margin-top:14px">Floating popup (no app switching)</div>
     <div class="small muted">Shows a small card on top of whatever app you're in, with your categories and a note box. Pick, type, Save, and you're still in BHIM.</div>
     <ol class="steps small" style="margin-bottom:0">
-      <li class="${nat.overlay ? 'ok' : ''}">${nat.overlay ? '✓ Display over other apps is on' : 'Allow <b>Display over other apps</b> for Kharcha: <button class="btn small" data-act="natoverlay">Open settings</button><br><span class="muted">Without it, the popup is a notification instead (or floats only after the payment-screen reader is on).</span>'}</li>
+      <li class="${nat.overlay ? 'ok' : ''}">${nat.overlay ? '✓ Display over other apps is on' : 'Allow <b>Display over other apps</b> for Kharcha: <button class="btn small" data-act="natoverlay">Open settings</button><br><span class="muted">Without it, the popup shows as a notification instead.</span>'}</li>
     </ol>
     <div class="bold" style="margin-top:14px">Always-there shortcuts</div>
-    <div class="small muted">A <b>Tap to add an expense</b> entry sits in your notification shade. You can also add the <b>Add expense</b> tile: swipe down twice, tap the pencil, drag it in.</div>
+    <div class="small muted">A <b>Just paid? Type the amount</b> entry sits in your notification shade. You can also add the <b>Add expense</b> tile: swipe down twice, tap the pencil, drag it in.</div>
     <button class="btn block" style="margin-top:12px" data-act="natquick">Show the ₹ Add notification</button>
     <button class="btn block ghost" style="margin-top:6px" data-act="nattest">Send a test popup</button></div>`;
 }
@@ -530,7 +535,7 @@ function viewSettings() {
     <div class="item"><button class="btn block" data-act="catnew">＋ Add a category</button></div></div>
 
   ${IS_APP ? nativeCard() : ''}
-  <h2>${IS_APP ? 'Other ways to add (optional)' : 'Auto-popup on Android'}</h2><div class="card" ${IS_APP ? 'hidden' : ''}>
+  ${IS_APP ? '' : '<h2>Auto-popup on Android</h2>'}<div class="card" ${IS_APP ? 'hidden' : ''}>
     <p style="margin-top:0">Make Kharcha pop up by itself every time Google Pay, PhonePe, Paytm or your bank tells you money left your account.</p>
     <ol class="steps small">
       <li>${IS_APP ? '<b>Kharcha is installed</b> as an app. The link below opens it directly.' : '<b>Install Kharcha</b> to your home screen: open the browser menu and tap <i>Install app</i> or <i>Add to Home screen</i>.'}</li>
@@ -640,7 +645,8 @@ function renderAdd() {
     <div class="modes">${['UPI', 'Card', 'Cash'].map(m => `<button data-mode="${m}" class="${d.mode === m ? 'on' : ''}">${m}</button>`).join('')}<input id="when" type="datetime-local" value="${local}" style="flex:1.6;padding:6px 8px;font-size:13px"></div>
     <div class="pad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map(k => `<button data-key="${k}">${k}</button>`).join('')}</div>
     <div class="actions">${d.editing ? `<button class="btn danger" data-act="deltx">Delete</button>` : `<button class="btn" data-act="skip" title="You were going to buy it, and didn't">Skipped it <span class="gs">💪</span></button>`}
-      <button class="btn primary" data-act="savetx">${d.editing ? 'Update' : 'Save'}</button></div>`);
+      <button class="btn primary" data-act="savetx">${d.editing ? 'Update' : 'Save'}</button></div>
+    ${d.editing ? '' : '<div class="small muted" style="text-align:center;margin-top:10px">Were going to buy it and didn\'t? Tap <b>Skipped it</b> to bank the money.</div>'}`);
   // do not steal focus on phones; the numpad is the input
 }
 function syncDraftInputs() {
