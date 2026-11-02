@@ -25,4 +25,10 @@ for (const [text, amt, merchant, kind] of cases) {
 assert.equal(guessCategory('Zomato'), 'food');
 assert.equal(guessCategory('UBER INDIA'), 'travel');
 assert.equal(guessCategory('blinkit'), 'groceries');
+assert.equal(guessCategory('Netflix'), 'subscriptions');
+assert.equal(guessCategory('Amazon Prime'), 'subscriptions');
+assert.equal(guessCategory('Amazon'), 'shopping');
+assert.equal(guessCategory('HPCL Petrol Pump'), 'petrol');
+assert.equal(guessCategory('Shell'), 'petrol');
+assert.equal(guessCategory('Claude.ai'), 'subscriptions');
 console.log(`${ok}/${cases.length} parser cases passed`);

@@ -14,8 +14,8 @@ import java.net.URLEncoder;
 /** The quick popup: a heads-up notification with one-tap save buttons. Tapping it opens the full quick-add sheet. */
 final class Notifier {
     static final String CHANNEL = "kharcha_tx";
-    static final String[] NAMES = {"food", "groceries", "travel", "shopping", "bills", "fun", "health", "other"};
-    static final String[] LABELS = {"Food", "Groceries", "Travel", "Shopping", "Bills", "Fun", "Health", "Other"};
+    static final String[] NAMES = {"food", "shopping", "petrol", "subscriptions", "groceries", "travel", "bills", "other"};
+    static final String[] LABELS = {"Food", "Shopping", "Petrol", "Subscriptions", "Groceries", "Travel", "Bills", "Other"};
 
     static String label(Context c, String cat) {
         for (String[] x : Store.cats(c)) if (x[0].equals(cat)) return x[1];

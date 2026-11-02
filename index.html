@@ -148,12 +148,12 @@ ol.steps { padding-left: 20px; margin: 8px 0; } ol.steps li { margin-bottom: 8px
 const KEY = 'kharcha.v1';
 const DEFAULT_CATS = [
   { id: 'food', name: 'Food', emoji: '🍔', budget: 0 },
+  { id: 'shopping', name: 'Shopping', emoji: '🛍️', budget: 0 },
+  { id: 'petrol', name: 'Petrol', emoji: '⛽', budget: 0 },
+  { id: 'subscriptions', name: 'Subscriptions', emoji: '🔁', budget: 0 },
   { id: 'groceries', name: 'Groceries', emoji: '🛒', budget: 0 },
   { id: 'travel', name: 'Travel', emoji: '🚕', budget: 0 },
-  { id: 'shopping', name: 'Shopping', emoji: '🛍️', budget: 0 },
   { id: 'bills', name: 'Bills', emoji: '🧾', budget: 0 },
-  { id: 'fun', name: 'Fun', emoji: '🎉', budget: 0 },
-  { id: 'health', name: 'Health', emoji: '💊', budget: 0 },
   { id: 'other', name: 'Other', emoji: '✨', budget: 0 },
 ];
 function freshState() {
@@ -161,7 +161,20 @@ function freshState() {
     cats: DEFAULT_CATS.map(c => ({ ...c })), tx: [], goals: [], saves: [] };
 }
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.v === 1) return Object.assign(freshState(), s); } catch (e) {}
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.v === 1) {
+      const st = Object.assign(freshState(), s);
+      if (!st.settings.catsV2) {   // one-time: add Petrol + Subscriptions and put your four main ones first
+        DEFAULT_CATS.forEach(d => { if (!st.cats.some(c => c.id === d.id)) st.cats.splice(st.cats.length - 1, 0, { ...d }); });
+        const first = ['food', 'shopping', 'petrol', 'subscriptions'];
+        const head = first.map(id => st.cats.find(c => c.id === id)).filter(Boolean);
+        st.cats = head.concat(st.cats.filter(c => !first.includes(c.id)));
+        st.settings.catsV2 = true;
+      }
+      return st;
+    }
+  } catch (e) {}
   return freshState();
 }
 let S = load();

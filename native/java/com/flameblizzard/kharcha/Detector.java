@@ -19,12 +19,14 @@ final class Detector {
         Pattern.compile("(?i)\\binfo[:\\s]+(?:upi/)?([^\\n.,]+)"),
     };
     private static final String[][] CATS = {
-        {"food", "zomato|swiggy|domino|pizza|mcdonald|kfc|burger|cafe|coffee|starbucks|chai|restaurant|hotel|dhaba|bakery|eats|food|biryani|subway|haldiram"},
+        {"subscriptions", "netflix|spotify|prime video|amazon prime|hotstar|disney|youtube|google one|google play|icloud|apple\\.com|apple media|itunes|chatgpt|openai|anthropic|claude|canva|adobe|notion|github|microsoft|office 365|dropbox|zee5|sonyliv|jiocinema|audible|linkedin|duolingo|subscription|autopay|mandate|renewal|playstation|xbox|steam"},
+        {"petrol", "petrol|diesel|fuel|hpcl|bpcl|iocl|indian oil|indianoil|bharat petroleum|hindustan petroleum|shell|nayara|reliance bp|jio-bp|essar|fastag|pump"},
+        {"food", "zomato|swiggy|domino|pizza|mcdonald|kfc|burger|cafe|coffee|starbucks|chai|restaurant|hotel|dhaba|bakery|eats|food|biryani|subway|haldiram|barbeque|dineout|eatsure|magicpin"},
         {"groceries", "blinkit|zepto|instamart|bigbasket|dmart|grocer|kirana|mart|reliance fresh|jiomart|milk|dairy|vegetable|fruit"},
-        {"travel", "uber|ola|rapido|irctc|railway|metro|petrol|fuel|hpcl|bpcl|indian oil|shell|fastag|redbus|makemytrip|goibibo|indigo|cab|parking"},
-        {"shopping", "amazon|flipkart|myntra|ajio|meesho|nykaa|decathlon|croma|store|shop|mall|fashion|lifestyle"},
-        {"bills", "airtel|jio|vodafone|bsnl|electric|bescom|msedcl|tata power|recharge|broadband|wifi|gas|rent|emi|insurance|lic"},
-        {"fun", "netflix|spotify|prime|hotstar|bookmyshow|pvr|inox|steam|playstation|game|movie|youtube|disney"},
+        {"shopping", "amazon|flipkart|myntra|ajio|meesho|nykaa|decathlon|croma|store|shop|mall|fashion|lifestyle|reliance digital|tata cliq|snapdeal"},
+        {"travel", "uber|ola|rapido|irctc|railway|metro|redbus|makemytrip|goibibo|indigo|air india|cab|auto|parking|yatra|ixigo"},
+        {"bills", "airtel|jio|vodafone|bsnl|electric|bescom|msedcl|tata power|recharge|broadband|wifi|gas|water|rent|emi|insurance|lic"},
+        {"fun", "bookmyshow|pvr|inox|game|movie"},
         {"health", "pharm|medic|apollo|1mg|netmeds|hospital|clinic|doctor|lab|gym|cult"},
     };
 

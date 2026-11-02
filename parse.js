@@ -46,12 +46,14 @@
   }
 
   const KEYWORDS = {
-    food: /zomato|swiggy|domino|pizza|mcdonald|kfc|burger|cafe|coffee|starbucks|chai|restaurant|hotel|dhaba|bakery|eats|food|biryani|subway|haldiram/i,
+    subscriptions: /netflix|spotify|prime video|amazon prime|hotstar|disney|youtube|google one|google play|icloud|apple\.com|apple media|itunes|chatgpt|openai|anthropic|claude|canva|adobe|notion|github|microsoft|office 365|dropbox|zee5|sonyliv|jiocinema|audible|linkedin|duolingo|subscription|autopay|mandate|renewal|playstation|xbox|steam/i,
+    petrol: /petrol|diesel|fuel|hpcl|bpcl|iocl|indian oil|indianoil|bharat petroleum|hindustan petroleum|shell|nayara|reliance bp|jio-bp|essar|fastag|pump/i,
+    food: /zomato|swiggy|domino|pizza|mcdonald|kfc|burger|cafe|coffee|starbucks|chai|restaurant|hotel|dhaba|bakery|eats|food|biryani|subway|haldiram|barbeque|dineout|eatsure|magicpin/i,
     groceries: /blinkit|zepto|instamart|bigbasket|dmart|grocer|kirana|mart|reliance fresh|jiomart|milk|dairy|vegetable|fruit/i,
-    travel: /uber|ola|rapido|irctc|railway|metro|petrol|fuel|hpcl|bpcl|indian oil|shell|fastag|redbus|makemytrip|goibibo|indigo|air|cab|auto|parking/i,
-    shopping: /amazon|flipkart|myntra|ajio|meesho|nykaa|decathlon|croma|store|shop|mall|fashion|lifestyle/i,
+    shopping: /amazon|flipkart|myntra|ajio|meesho|nykaa|decathlon|croma|store|shop|mall|fashion|lifestyle|reliance digital|tata cliq|snapdeal/i,
+    travel: /uber|ola|rapido|irctc|railway|metro|redbus|makemytrip|goibibo|indigo|air india|cab|auto|parking|yatra|ixigo/i,
     bills: /airtel|jio|vodafone|\bvi\b|bsnl|electric|bescom|msedcl|tata power|recharge|broadband|wifi|gas|water|rent|emi|insurance|lic/i,
-    fun: /netflix|spotify|prime|hotstar|bookmyshow|pvr|inox|steam|playstation|game|movie|youtube|disney/i,
+    fun: /bookmyshow|pvr|inox|game|movie/i,
     health: /pharm|medic|apollo|1mg|netmeds|hospital|clinic|doctor|lab|gym|cult/i,
   };
   function guessCategory(text) {
