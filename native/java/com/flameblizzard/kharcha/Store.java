@@ -23,6 +23,18 @@ final class Store {
         return s;
     }
 
+    /** Category list (id, name) in the order set in the app, so popup buttons match the user's own categories. */
+    static void setCats(Context c, String json) { sp(c).edit().putString("cats", json).apply(); }
+    static java.util.List<String[]> cats(Context c) {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(sp(c).getString("cats", "[]"));
+            for (int i = 0; i < a.length(); i++) { JSONObject o = a.getJSONObject(i); out.add(new String[]{o.getString("id"), o.getString("name")}); }
+        } catch (Exception ignored) { }
+        if (out.isEmpty()) for (int i = 0; i < Notifier.NAMES.length; i++) out.add(new String[]{Notifier.NAMES[i], Notifier.LABELS[i]});
+        return out;
+    }
+
     /** Last "payment successful"-looking screen text, kept only on this phone so detection can be debugged. */
     static void setLastScreen(Context c, String t) { sp(c).edit().putString("lastScreen", t.length() > 700 ? t.substring(0, 700) : t).apply(); }
     static String lastScreen(Context c) { return sp(c).getString("lastScreen", ""); }

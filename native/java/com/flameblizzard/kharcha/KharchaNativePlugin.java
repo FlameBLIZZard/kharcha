@@ -34,6 +34,13 @@ public class KharchaNativePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void setCats(PluginCall call) {
+        JSArray a = call.getArray("cats");
+        if (a != null) Store.setCats(getContext(), a.toString());
+        call.resolve();
+    }
+
+    @PluginMethod
     public void lastScreen(PluginCall call) {
         JSObject o = new JSObject();
         o.put("text", Store.lastScreen(getContext()));

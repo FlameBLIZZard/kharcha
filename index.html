@@ -440,7 +440,7 @@ function viewSettings() {
     <div class="field"><label>Currency symbol</label><input data-set="currency" value="${esc(st.currency)}" maxlength="4"></div></div>
     <div class="small muted">${st.income ? `You can spend ${money(Math.max(0, st.income - st.saveTarget), { dec: false })} a month, about ${money(Math.max(0, st.income - st.saveTarget) / period().days, { dec: false })} a day. Saving ${st.income ? Math.round(st.saveTarget / st.income * 100) : 0}% of income.` : 'Add your income to unlock the daily safe-to-spend number.'}</div>
   </div>
-  <h2>Category budgets</h2><div class="card list">${S.cats.map(ct => `<div class="item"><div class="emoji">${ct.emoji}</div><div class="grow bold">${esc(ct.name)}</div><input data-catbudget="${ct.id}" type="number" inputmode="decimal" value="${ct.budget || ''}" placeholder="No limit" style="width:120px;text-align:right"><button class="btn ghost" data-act="catedit" data-id="${ct.id}" aria-label="Edit category">✎</button></div>`).join('')}
+  <h2>Categories and budgets</h2><div class="small muted" style="margin:-4px 4px 10px">Use ↑ to move your favourites to the top. The payment popup offers them first.</div><div class="card list">${S.cats.map(ct => `<div class="item"><div class="emoji">${ct.emoji}</div><div class="grow bold">${esc(ct.name)}</div><input data-catbudget="${ct.id}" type="number" inputmode="decimal" value="${ct.budget || ''}" placeholder="No limit" style="width:120px;text-align:right"><button class="btn ghost" data-act="catup" data-id="${ct.id}" aria-label="Move up" title="Move up (popup buttons follow this order)">↑</button><button class="btn ghost" data-act="catedit" data-id="${ct.id}" aria-label="Edit category">✎</button></div>`).join('')}
     <div class="item"><button class="btn block" data-act="catnew">＋ Add a category</button></div></div>
 
   ${IS_APP ? nativeCard() : ''}
@@ -678,6 +678,7 @@ function handleIncoming() {
 /* ---------- Android app: payment notifications ---------- */
 const KN = IS_APP && window.Capacitor.Plugins ? window.Capacitor.Plugins.KharchaNative : null;
 let nat = { listener: false, notifications: false, screen: false };
+function syncCats() { if (KN) KN.setCats({ cats: S.cats.map(c => ({ id: c.id, name: c.name })) }).catch(() => {}); }
 async function nativeSync() {
   if (!KN) return;
   try {
@@ -689,6 +690,7 @@ async function nativeSync() {
       added++;
     });
     if (added) { save(); render(); toast(added + ' expense' + (added > 1 ? 's' : '') + ' saved from notifications'); }
+    syncCats();
     nat = await KN.status();
     if (tab === 'settings' && !draft) render();
   } catch (e) {}
@@ -745,15 +747,16 @@ document.addEventListener('click', e => {
       checkGoalMilestone(S.goals.find(g => g.id === gid)); break;
     }
     case 'delsave': if (confirm('Remove this savings entry?')) { S.saves = S.saves.filter(s => s.id !== id); save(); render(); } break;
+    case 'catup': { const k = S.cats.findIndex(c => c.id === id); if (k > 0) { [S.cats[k - 1], S.cats[k]] = [S.cats[k], S.cats[k - 1]]; save(); syncCats(); render(); } break; }
     case 'catedit': catForm(S.cats.find(c => c.id === id)); break;
     case 'catnew': catForm(); break;
     case 'catsave': {
       const name = $('#c-name').value.trim(); if (!name) { toast('Name it'); break; }
       const ct = S.cats.find(x => x.id === id) || (S.cats.splice(S.cats.length - 1, 0, { id }), S.cats.find(x => x.id === id));
       Object.assign(ct, { name, emoji: $('#c-emoji').value.trim() || '🏷️', budget: +$('#c-budget').value || 0 });
-      save(); closeSheet(); render(); break;
+      save(); syncCats(); closeSheet(); render(); break;
     }
-    case 'catdel': if (confirm('Delete this category? Its expenses move to Other.')) { S.tx.forEach(x => { if (x.cat === id) x.cat = 'other'; }); S.cats = S.cats.filter(c => c.id !== id); save(); closeSheet(); render(); } break;
+    case 'catdel': if (confirm('Delete this category? Its expenses move to Other.')) { S.tx.forEach(x => { if (x.cat === id) x.cat = 'other'; }); S.cats = S.cats.filter(c => c.id !== id); save(); syncCats(); closeSheet(); render(); } break;
     case 'natlisten': KN && KN.openAccessSettings(); break;
     case 'natlast': KN && KN.lastScreen().then(r => prompt('Text of the last payment screen Kharcha saw (stays on this phone). Copy it if you want me to fix the reader:', r.text || '(nothing yet)')); break;
     case 'natscreen': KN && KN.openScreenReaderSettings(); break;
