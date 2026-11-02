@@ -163,6 +163,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .92em; backgro
 .donut { width: 128px; height: 128px; flex: none; }
 .legend .row { padding: 5px 0; gap: 8px; } .legend .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .actions .btn { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+.whenchip { display: flex; justify-content: center; margin: 2px 0 10px; }
+@keyframes pulse { 0%, 100% { transform: none; } 50% { transform: scale(1.06); } }
+.btn.pulse { animation: pulse .45s var(--spring) 2; }
 .cat.new { background: transparent; border: 1.5px dashed var(--mute); color: var(--mute); }
 .sheet .actions { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom)); margin: 0 -18px; padding: 12px 18px calc(18px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 14px); z-index: 2; }
 html.sheet-open .toast { bottom: auto; top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%) translateY(-24px) scale(.96); }
@@ -661,7 +664,7 @@ function viewSettings() {
   </div>
   <h2>Subscriptions</h2><div class="card list">${(S.subs || []).map(x => `<button class="item" data-act="subedit" data-id="${x.id}"><div class="emoji">${catById(x.cat).emoji}</div><div class="grow"><div class="bold ellipsis">${esc(x.name)}</div><div class="small muted">Every month on the ${x.day}${['th','st','nd','rd'][(x.day % 10 > 3 || [11, 12, 13].includes(x.day)) ? 0 : x.day % 10]}</div></div><div class="bold num">${money(x.amt)}</div></button>`).join('')}
     <div class="item"><button class="btn block" data-act="subnew">＋ Add a subscription</button></div></div>
-  <h2>Categories and budgets</h2><div class="small muted" style="margin:-4px 4px 10px">Use ↑ to move your favourites to the top. The payment popup offers them first.</div><div class="card list">${S.cats.map(ct => `<div class="item"><div class="emoji">${ct.emoji}</div><div class="grow bold">${esc(ct.name)}</div><input data-catbudget="${ct.id}" type="number" inputmode="decimal" value="${ct.budget || ''}" placeholder="No limit" style="width:120px;text-align:right"><button class="btn ghost" data-act="catup" data-id="${ct.id}" aria-label="Move up" title="Move up (popup buttons follow this order)">↑</button><button class="btn ghost" data-act="catedit" data-id="${ct.id}" aria-label="Edit category">✎</button></div>`).join('')}
+  <h2>Categories and budgets</h2><div class="small muted" style="margin:-4px 4px 10px">Use ↑ to move your favourites to the top. The payment popup offers them first.</div><div class="card list">${S.cats.map(ct => `<div class="item"><div class="emoji">${ct.emoji}</div><button class="grow" data-act="catedit" data-id="${ct.id}" style="text-align:left;padding:4px 0"><div class="bold ellipsis">${esc(ct.name)}</div><div class="small muted">${ct.budget ? money(ct.budget, { dec: false }) + ' a month' : 'No budget · tap to set'}</div></button><button class="btn ghost" data-act="catup" data-id="${ct.id}" aria-label="Move up" title="Move up (popup buttons follow this order)">↑</button><button class="btn ghost" data-act="catedit" data-id="${ct.id}" aria-label="Edit category">✎</button></div>`).join('')}
     <div class="item"><button class="btn block" data-act="catnew">＋ Add a category</button></div></div>
 
   ${IS_APP ? nativeCard() : ''}
@@ -774,7 +777,8 @@ function renderAdd() {
     <div class="cats">${S.cats.map(x => `<button class="cat ${d.cat === x.id ? 'on' : ''}" data-cat="${x.id}"><span class="e">${x.emoji}</span>${esc(x.name)}</button>`).join('')}<button class="cat new" data-act="catnew-add"><span class="e">＋</span>New</button></div>
     ${catBudgetHint}
     <input id="note" placeholder="Note (what was it?)" value="${esc(d.note)}" maxlength="80" autocomplete="off" style="margin:8px 0 10px">
-    <div class="modes">${['UPI', 'Card', 'Cash'].map(m => `<button data-mode="${m}" class="${d.mode === m ? 'on' : ''}">${m}</button>`).join('')}<input id="when" type="datetime-local" value="${local}" style="flex:1.6;padding:6px 8px;font-size:13px"></div>
+    ${d.more ? `<div class="modes">${['UPI', 'Card', 'Cash'].map(m => `<button data-mode="${m}" class="${d.mode === m ? 'on' : ''}">${m}</button>`).join('')}<input id="when" type="datetime-local" value="${local}" style="flex:1.6;padding:6px 8px;font-size:13px"></div>`
+      : `<div class="whenchip"><button class="chip" data-act="addmore">${relDay(d.ts)} ${timeStr(d.ts)} · ${esc(d.mode)} ▾</button></div>`}
     <div class="pad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map(k => `<button data-key="${k}">${k}</button>`).join('')}</div>
     <div class="actions">${d.editing ? `<button class="btn danger" data-act="deltx">Delete</button>` : `<button class="btn" data-act="skip" title="You were going to buy it, and didn't">Skipped it <span class="gs">💪</span></button>`}
       <button class="btn primary" data-act="savetx">${d.editing ? 'Update' : 'Save'}</button></div>
@@ -799,15 +803,28 @@ function saveTx() {
   if (!amt) { toast('Type an amount first'); return; }
   const tx = { id: draft.id, amt, cat: draft.cat || 'other', note: draft.note.trim(), mode: draft.mode, ts: draft.ts, src: draft.src };
   const i = S.tx.findIndex(t => t.id === tx.id);
+  const before = calc();
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
   save();
   const wasEdit = draft.editing; closeSheet(); render();
   if (navigator.vibrate) navigator.vibrate(15);
   const c = calc();
+  const undo = { label: 'Undo', fn: () => { S.tx = S.tx.filter(x => x.id !== tx.id); save(); render(); toast('Removed'); } };
+  const cross = budgetCrossing(tx.cat, before, c);
   if (wasEdit) toast('Updated');
-  else if (c.income) toast(c.leftToday >= 0 ? `Logged ${money(amt)} · ${money(c.leftToday, { dec: false })} left today` : `Logged ${money(amt)} · over today by ${money(-c.leftToday, { dec: false })}`);
-  else toast(`Logged ${money(amt)} under ${catById(tx.cat).name}`);
+  else if (cross) toast(cross, 5000, undo);
+  else if (c.income) toast(c.leftToday >= 0 ? `Logged ${money(amt)} · ${money(c.leftToday, { dec: false })} left today` : `Logged ${money(amt)} · over today by ${money(-c.leftToday, { dec: false })}`, 2600, undo);
+  else toast(`Logged ${money(amt)} under ${catById(tx.cat).name}`, 2600, undo);
   if (fromLink) setTimeout(() => { fromLink = false; }, 0);
+}
+/** A heads-up when this expense pushes a category past 80% or 100% of its monthly budget. */
+function budgetCrossing(catId, before, after) {
+  const ct = catById(catId), b = +ct.budget || 0; if (!b) return '';
+  const spent = c => sum(c.txP.filter(t => t.cat === catId).map(t => t.amt));
+  const s0 = spent(before), s1 = spent(after);
+  if (s0 <= b && s1 > b) return `${ct.name} is over budget: ${money(s1)} of ${money(b, { dec: false })}`;
+  if (s0 <= b * .8 && s1 > b * .8) return `${ct.name} is at ${Math.round(s1 / b * 100)}% of its budget, ${money(b - s1, { dec: false })} left`;
+  return '';
 }
 function skipTx() {
   syncDraftInputs();
@@ -927,7 +944,18 @@ document.addEventListener('click', e => {
   const t = e.target.closest('button, [data-tab]'); if (!t) return;
   if (t.dataset.tab) { go(t.dataset.tab); return; }
   if (t.dataset.key) { tick(); padKey(t.dataset.key); return; }
-  if (t.dataset.cat && draft) { tick(10); syncDraftInputs(); draft.cat = draft.cat === t.dataset.cat ? '' : t.dataset.cat; renderAdd(); return; }
+  if (t.dataset.cat && draft) {
+    tick(10); syncDraftInputs();
+    // Auto-detected payment with the amount already filled: picking the category is the second tap, so save.
+    // (Tapping the category Kharcha already guessed confirms it instead of un-picking it.)
+    const auto = !draft.editing && draft.src !== 'manual' && parseFloat(draft.amtStr) && !draft.kind
+      && !S.tx.some(x => Math.abs(x.amt - parseFloat(draft.amtStr)) < .01 && Math.abs(x.ts - Date.now()) < 5 * 60e3);
+    draft.cat = (draft.cat === t.dataset.cat && !auto) ? '' : t.dataset.cat;
+    if (auto) { saveTx(); return; }
+    renderAdd();
+    if (draft.cat && parseFloat(draft.amtStr)) { const b = $('[data-act="savetx"]'); if (b) b.classList.add('pulse'); }
+    return;
+  }
   if (t.dataset.mode && draft) { syncDraftInputs(); draft.mode = t.dataset.mode; renderAdd(); return; }
   if (t.dataset.hview) { histView = t.dataset.hview; render(true); return; }
   if (t.dataset.hcat !== undefined) { histCat = t.dataset.hcat; render(); return; }
@@ -959,6 +987,7 @@ document.addEventListener('click', e => {
       toast('Deleted ' + money(gone.amt), 5000, { label: 'Undo', fn: () => { if (!S.tx.some(x => x.id === gone.id)) { S.tx.push(gone); save(); render(); toast('Restored'); } } });
       break;
     }
+    case 'addmore': syncDraftInputs(); draft.more = true; renderAdd(); break;
     case 'toastact': { const f = toast._fn; toast._fn = null; $('#toast').classList.remove('show'); if (f) f(); break; }
     case 'close': if (catForm.back) { const d = catForm.back; catForm.back = null; draft = d; renderAdd(); } else closeSheet(); break;
     case 'newgoal': goalForm(); break;
