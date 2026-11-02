@@ -1187,6 +1187,12 @@ async function nativeSync() {
     let added = 0;
     (r.items || []).forEach(it => {
       if (S.tx.some(t => t.id === it.id)) return;
+      const bm = /^bill-(.+)-(\d{4})-(\d{2})$/.exec(it.id || '');   // "Mark paid" on a bill reminder
+      if (bm) {
+        const mk = bm[2] + '-' + (+bm[3]), sub = (S.subs || []).find(x => x.id === bm[1]);
+        if (S.tx.some(t => t.id === 'sub-' + bm[1] + '-' + mk)) return;   // already auto-logged this month: do not count twice
+        if (sub) sub.last = mk;                                            // and do not auto-log it again later
+      }
       S.tx.push({ id: it.id, amt: it.amt, cat: S.cats.some(c => c.id === it.cat) ? it.cat : 'other', note: it.note || '', mode: 'UPI', ts: it.ts, src: 'notif' });
       added++;
     });
