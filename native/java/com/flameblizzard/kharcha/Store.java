@@ -23,6 +23,10 @@ final class Store {
         return s;
     }
 
+    /** Last "payment successful"-looking screen text, kept only on this phone so detection can be debugged. */
+    static void setLastScreen(Context c, String t) { sp(c).edit().putString("lastScreen", t.length() > 700 ? t.substring(0, 700) : t).apply(); }
+    static String lastScreen(Context c) { return sp(c).getString("lastScreen", ""); }
+
     /** True if the same amount was already announced in the last 3 minutes (SMS + app notification for one payment). */
     static synchronized boolean isDuplicate(Context c, double amt) {
         SharedPreferences p = sp(c);

@@ -56,6 +56,30 @@ final class Notifier {
         } catch (SecurityException | java.io.UnsupportedEncodingException ignored) { }
     }
 
+    /** Always-there "Add expense" entry in the notification shade. Shown whenever the listener connects (also after reboot). */
+    static void showQuickAdd(Context c) {
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                NotificationChannel ch = new NotificationChannel("kharcha_quick", "Quick add", NotificationManager.IMPORTANCE_LOW);
+                ch.setDescription("A permanent shortcut to add an expense");
+                c.getSystemService(NotificationManager.class).createNotificationChannel(ch);
+            }
+            Intent open = new Intent(c, MainActivity.class).setAction(Intent.ACTION_VIEW).setData(Uri.parse("kharcha://add"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            PendingIntent tap = PendingIntent.getActivity(c, 7, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+            NotificationCompat.Builder b = new NotificationCompat.Builder(c, "kharcha_quick")
+                .setSmallIcon(android.R.drawable.ic_menu_add)
+                .setContentTitle("Kharcha")
+                .setContentText("Tap to add an expense")
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .setShowWhen(false)
+                .setContentIntent(tap);
+            NotificationManagerCompat nm = NotificationManagerCompat.from(c);
+            if (nm.areNotificationsEnabled()) nm.notify(7, b.build());
+        } catch (SecurityException ignored) { }
+    }
+
     private static PendingIntent action(Context c, int id, String amt, String merchant, String cat, String what) {
         Intent i = new Intent(c, ActionReceiver.class).setAction("com.flameblizzard.kharcha." + what + id + cat)
             .putExtra("id", id).putExtra("amt", amt).putExtra("merchant", merchant).putExtra("cat", cat).putExtra("what", what);

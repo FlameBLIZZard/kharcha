@@ -8,6 +8,9 @@ import android.service.notification.StatusBarNotification;
 /** Watches other apps' notifications (needs the Notification access switch) and reacts to payments. */
 public class TxListener extends NotificationListenerService {
     @Override
+    public void onListenerConnected() { Notifier.showQuickAdd(getApplicationContext()); }
+
+    @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         try {
             if (sbn == null || getPackageName().equals(sbn.getPackageName())) return;
