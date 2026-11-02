@@ -496,7 +496,7 @@ function go(t) { tab = t; render(true); window.scrollTo(0, 0); }
 function render(enter) {
   document.documentElement.dataset.theme = S.settings.theme || 'dark';
   document.querySelector('meta[name=theme-color]').content = S.settings.theme === 'light' ? '#ffffff' : '#000000';
-  if (!S.settings.onboarded) { $('#tabs').hidden = true; renderOnboarding(); return; }
+  if (!S.settings.onboarded || replay) { $('#tabs').hidden = true; renderOnboarding(); return; }
   if (IS_APP && KN && !natLoaded) { $('#tabs').hidden = true; $('#app').innerHTML = ''; return; }   // wait for the permission check
   if (permNeeded()) { $('#tabs').hidden = true; renderPerms(); return; }
   $('#tabs').hidden = false;
@@ -815,6 +815,7 @@ function viewSettings() {
   <h2>App</h2><div class="card">
     <div class="field"><label>Theme</label><div class="seg" style="margin:0">${['dark', 'light'].map(t => `<button data-theme-btn="${t}" class="${(st.theme || 'dark') === t ? 'on' : ''}">${t === 'dark' ? 'Dark' : 'Light'}</button>`).join('')}</div></div>
     <div class="two"><button class="btn" data-act="wrap">Last month's wrap-up</button><button class="btn" data-act="whatsnew">What's new</button></div>
+    <button class="btn block" style="margin-bottom:10px" data-act="replay">Replay the intro</button>
     <div class="two" style="margin-top:10px"><button class="btn" data-act="export">Backup (JSON)</button><button class="btn" data-act="import">Restore</button></div>
     <button class="btn block" style="margin-top:10px" data-act="csv">Export spreadsheet (CSV)</button>
     <button class="btn block danger" style="margin-top:10px" data-act="reset">Erase everything</button>
@@ -825,6 +826,7 @@ function viewSettings() {
 }
 
 /* ---------- onboarding ---------- */
+let replay = false;
 let onb = { step: 0, name: '', income: '', save: '', goal: '', goalTarget: '', goalEmoji: '🎯' };
 function onbSplit() {
   const inc = +onb.income || 0, sv = onb.save === '' ? Math.round(inc * .2) : Math.min(+onb.save || 0, inc);
@@ -1318,13 +1320,17 @@ document.addEventListener('click', e => {
   if (t.dataset.onb) {
     onbRead(); const a = t.dataset.onb;
     if (a === 'next') { onb.step++; renderOnboarding(); }
-    if (a === 'skip') { onb.income = ''; onb.save = ''; onb.step++; renderOnboarding(); }
+    if (a === 'skip') { if (!replay) { onb.income = ''; onb.save = ''; } onb.step++; renderOnboarding(); }
     if (a === 'finish' || a === 'finish-skip') {
-      S.settings.name = onb.name; S.settings.income = +onb.income || 0;
-      S.settings.saveTarget = onb.income ? (onb.save === '' ? Math.round(S.settings.income * .2) : +onb.save || 0) : 0;
+      S.settings.name = onb.name;
+      if (!replay || onb.income !== '') {
+        S.settings.income = +onb.income || 0;
+        S.settings.saveTarget = onb.income ? (onb.save === '' ? Math.round(S.settings.income * .2) : +onb.save || 0) : 0;
+      }
       if (a === 'finish' && onb.goal && +onb.goalTarget) S.goals.push({ id: uid(), name: onb.goal, emoji: onb.goalEmoji || '🎯', target: +onb.goalTarget, deadline: '' });
-      S.settings.onboarded = true; S.created = Date.now(); save(); go('home'); if (a === 'finish') setTimeout(confetti, 350);
-      if (S.settings.saveTarget) setTimeout(() => toast('First move: save ' + money(S.settings.saveTarget, { dec: false }) + ' before you spend anything'), 400);
+      const wasReplay = replay; replay = false;
+      S.settings.onboarded = true; if (!wasReplay) S.created = Date.now(); save(); go('home'); if (a === 'finish') setTimeout(confetti, 350);
+      if (S.settings.saveTarget && !wasReplay) setTimeout(() => toast('First move: save ' + money(S.settings.saveTarget, { dec: false }) + ' before you spend anything'), 400);
     }
     return;
   }
@@ -1360,6 +1366,7 @@ document.addEventListener('click', e => {
     case 'cashnew': cashForm(); break;
     case 'cashsave': { const amt = +$('#k-amt').value; if (!amt) { toast('How much did you withdraw?'); break; } S.cash.push({ id: uid(), amt, ts: Date.now(), note: $('#k-note').value.trim() }); save(); closeSheet(); render(); toast('Cash wallet: ' + money(cashBalance(), { dec: false })); break; }
     case 'cashdel': S.cash = S.cash.filter(x => x.id !== id); save(); render(); break;
+    case 'replay': replay = true; onb = { step: 0, name: S.settings.name || '', income: S.settings.income ? String(S.settings.income) : '', save: S.settings.saveTarget ? String(S.settings.saveTarget) : '', goal: '', goalTarget: '', goalEmoji: '🎯' }; window.scrollTo(0, 0); render(); break;
     case 'wrap': wrapSheet(); break;
     case 'previewnotif': pushNative(); setTimeout(() => { KN && KN.previewSchedule ? KN.previewSchedule().then(() => toast('Check your notifications'), () => toast('Allow notifications first')) : toast('Needs the updated Android app'); }, 900); break;
     case 'whatsnew': whatsNew(); break;
