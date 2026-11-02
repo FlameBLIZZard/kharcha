@@ -485,7 +485,8 @@ function nativeCard() {
     </ol>
     <div class="bold" style="margin-top:14px">Always-there shortcuts</div>
     <div class="small muted">A <b>Tap to add an expense</b> entry sits in your notification shade. You can also add the <b>Add expense</b> tile: swipe down twice, tap the pencil, drag it in.</div>
-    <button class="btn block" style="margin-top:12px" data-act="nattest">Send a test popup</button></div>`;
+    <button class="btn block" style="margin-top:12px" data-act="natquick">Show the ₹ Add notification</button>
+    <button class="btn block ghost" style="margin-top:6px" data-act="nattest">Send a test popup</button></div>`;
 }
 function viewSettings() {
   const st = S.settings, base = appUrl();
@@ -750,6 +751,7 @@ async function nativeSync() {
     if (added) { save(); render(); toast(added + ' expense' + (added > 1 ? 's' : '') + ' saved from notifications'); }
     syncCats();
     nat = await KN.status();
+    if (nat.notifications) KN.showQuickAdd().catch(() => {});
     if (tab === 'settings' && !draft) render();
   } catch (e) {}
 }
@@ -819,6 +821,7 @@ document.addEventListener('click', e => {
     case 'natoverlay': KN && KN.openOverlaySettings(); break;
     case 'natnotif': KN && KN.requestNotifications().then(() => setTimeout(nativeSync, 1500)); break;
     case 'natbattery': KN && KN.openBatterySettings(); break;
+    case 'natquick': KN && KN.requestNotifications().then(() => setTimeout(() => KN.showQuickAdd().then(() => toast('Pull down the notification shade')), 800)); break;
     case 'nattest': KN && (nat.notifications ? KN.test().then(() => toast('Check your notifications')) : toast('Allow popups first')); break;
     case 'copyurl': { const u = appUrl(); (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('Copied. Paste it in MacroDroid.'), () => prompt('Copy this URL', u)); break; }
     case 'smstest': { const v = $('#smstest').value.trim(); if (!v) { toast('Paste an SMS first'); break; } location.hash = '#add?text=' + encodeURIComponent(v); break; }
