@@ -58,7 +58,7 @@ comps = '''
 i = s.index('</application>')
 s = s[:i] + comps + s[i:]
 
-perm = '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n'
+perm = '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />\n'
 i = s.rindex('</manifest>')
 s = s[:i] + perm + s[i:]
 open(MANIFEST, 'w').write(s)

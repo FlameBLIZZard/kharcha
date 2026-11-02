@@ -410,7 +410,7 @@ function viewGoals() {
 const IS_APP = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
 function appUrl() { return IS_APP ? 'kharcha://add?text=' : location.href.split('#')[0].split('?')[0] + '#add?text='; }
 function nativeCard() {
-  const ok = nat.listener && nat.notifications && nat.screen;
+  const ok = nat.listener && nat.notifications && nat.screen && nat.overlay;
   return `<h2>Auto-popup</h2><div class="card ${ok ? '' : 'savefirst'}">
     <div class="row"><div class="emoji">${ok ? '✅' : '🔔'}</div><div class="grow"><div class="bold">${ok ? 'Auto-detect is on' : 'Turn on auto-detect'}</div>
     <div class="small muted">Kharcha reads payment notifications from BHIM, GPay, PhonePe, Paytm, your bank and SMS. When one arrives, a popup appears with one-tap save buttons. Nothing leaves your phone.</div></div></div>
@@ -423,6 +423,11 @@ function nativeCard() {
     <div class="small muted">BHIM and most UPI apps don't notify you when <i>you</i> pay, only when you receive. Kharcha can instead read the "Payment successful" screen right after you pay.</div>
     <ol class="steps small" style="margin-bottom:0">
       <li class="${nat.screen ? 'ok' : ''}">${nat.screen ? '✓ Screen reader is on' : 'Turn on <b>Kharcha payment detector</b>: <button class="btn small" data-act="natscreen">Open settings</button><br><span class="muted">Settings → Accessibility → Installed apps (or Downloaded apps) → Kharcha payment detector → On. It only looks at BHIM, GPay, PhonePe, Paytm and Amazon screens, keeps nothing, and never leaves your phone.</span>'}</li>
+    </ol>
+    <div class="bold" style="margin-top:14px">Floating popup (no app switching)</div>
+    <div class="small muted">Shows a small card on top of whatever app you're in, with your categories and a note box. Pick, type, Save, and you're still in BHIM.</div>
+    <ol class="steps small" style="margin-bottom:0">
+      <li class="${nat.overlay ? 'ok' : ''}">${nat.overlay ? '✓ Display over other apps is on' : 'Allow <b>Display over other apps</b> for Kharcha: <button class="btn small" data-act="natoverlay">Open settings</button><br><span class="muted">Without it, the popup is a notification instead (or floats only after the payment-screen reader is on).</span>'}</li>
     </ol>
     <div class="bold" style="margin-top:14px">Always-there shortcuts</div>
     <div class="small muted">A <b>Tap to add an expense</b> entry sits in your notification shade. You can also add the <b>Add expense</b> tile: swipe down twice, tap the pencil, drag it in.</div>
@@ -677,7 +682,7 @@ function handleIncoming() {
 
 /* ---------- Android app: payment notifications ---------- */
 const KN = IS_APP && window.Capacitor.Plugins ? window.Capacitor.Plugins.KharchaNative : null;
-let nat = { listener: false, notifications: false, screen: false };
+let nat = { listener: false, notifications: false, screen: false, overlay: false };
 function syncCats() { if (KN) KN.setCats({ cats: S.cats.map(c => ({ id: c.id, name: c.name })) }).catch(() => {}); }
 async function nativeSync() {
   if (!KN) return;
@@ -759,6 +764,7 @@ document.addEventListener('click', e => {
     case 'catdel': if (confirm('Delete this category? Its expenses move to Other.')) { S.tx.forEach(x => { if (x.cat === id) x.cat = 'other'; }); S.cats = S.cats.filter(c => c.id !== id); save(); syncCats(); closeSheet(); render(); } break;
     case 'natlisten': KN && KN.openAccessSettings(); break;
     case 'natlast': KN && KN.lastScreen().then(r => prompt('Text of the last payment screen Kharcha saw (stays on this phone). Copy it if you want me to fix the reader:', r.text || '(nothing yet)')); break;
+    case 'natoverlay': KN && KN.openOverlaySettings(); break;
     case 'natscreen': KN && KN.openScreenReaderSettings(); break;
     case 'natnotif': KN && KN.requestNotifications().then(() => setTimeout(nativeSync, 1500)); break;
     case 'natbattery': KN && KN.openBatterySettings(); break;

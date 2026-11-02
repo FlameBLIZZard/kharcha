@@ -26,17 +26,26 @@ final class Notifier {
         try {
             int id = (int) (System.currentTimeMillis() / 1000);
             String amtStr = (amt == Math.floor(amt)) ? String.valueOf((long) amt) : String.format(java.util.Locale.US, "%.2f", amt);
-            render(c, id, amtStr, merchant, cat, 0);
+            boolean overlay = Overlay.show(c.getApplicationContext(), id, amtStr, merchant, cat);
+            render(c, id, amtStr, merchant, cat, 0, overlay);
         } catch (Exception ignored) { }
     }
 
     /** Page 0: Save (guessed category) / Note... / More.  Later pages: two more categories each / More (loops back). */
     static void render(Context c, int id, String amtStr, String merchant, String guess, int page) {
+        render(c, id, amtStr, merchant, guess, page, false);
+    }
+
+    /** quiet = the floating card is already on screen, so keep this notification silent as a backup. */
+    static void render(Context c, int id, String amtStr, String merchant, String guess, int page, boolean quiet) {
         try {
             if (Build.VERSION.SDK_INT >= 26) {
                 NotificationChannel ch = new NotificationChannel(CHANNEL, "New expense", NotificationManager.IMPORTANCE_HIGH);
                 ch.setDescription("Pops up when a payment is detected");
                 c.getSystemService(NotificationManager.class).createNotificationChannel(ch);
+                NotificationChannel qc = new NotificationChannel("kharcha_tx_quiet", "New expense (quiet backup)", NotificationManager.IMPORTANCE_LOW);
+                qc.setDescription("Silent copy of the popup, in case you dismissed it");
+                c.getSystemService(NotificationManager.class).createNotificationChannel(qc);
             }
             java.util.List<String[]> all = Store.cats(c);
             String best = guess;
@@ -53,14 +62,14 @@ final class Notifier {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             PendingIntent tap = PendingIntent.getActivity(c, id, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-            NotificationCompat.Builder b = new NotificationCompat.Builder(c, CHANNEL)
+            NotificationCompat.Builder b = new NotificationCompat.Builder(c, quiet ? "kharcha_tx_quiet" : CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_menu_edit)
                 .setContentTitle("\u20b9" + amtStr + (merchant.isEmpty() ? " spent" : " \u00b7 " + merchant))
                 .setContentText(page == 0
                     ? (guess.isEmpty() ? "Pick a category, or tap to open" : "Looks like " + label(c, best) + ". Save, add a note, or tap for more")
                     : "Save under\u2026")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setPriority(quiet ? NotificationCompat.PRIORITY_LOW : NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(quiet ? 0 : NotificationCompat.DEFAULT_ALL)
                 .setOnlyAlertOnce(true)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(true)

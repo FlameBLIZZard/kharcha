@@ -11,7 +11,17 @@ import java.util.ArrayList;
  * and shows the quick popup when a "payment successful" screen appears. Nothing is stored or sent anywhere.
  */
 public class PayWatcher extends AccessibilityService {
+    static volatile PayWatcher instance;
     private long last = 0;
+
+    @Override
+    protected void onServiceConnected() { instance = this; }
+
+    @Override
+    public boolean onUnbind(android.content.Intent intent) { if (instance == this) instance = null; return super.onUnbind(intent); }
+
+    @Override
+    public void onDestroy() { if (instance == this) instance = null; super.onDestroy(); }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
