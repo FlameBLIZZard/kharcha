@@ -85,4 +85,13 @@ sp = 'android/app/src/main/res/values/strings.xml'
 t = open(sp).read()
 t = t.replace('</resources>', '    <string name="kharcha_a11y_desc">Looks for the "payment successful" screen in BHIM, GPay, PhonePe and Paytm so Kharcha can pop up and ask what you spent on. Reads text on those apps only. Nothing is stored or sent anywhere.</string>\n</resources>')
 open(sp, 'w').write(t)
+# black-and-white launcher icons and a plain black splash instead of the Capacitor defaults
+res = 'android/app/src/main/res'
+shutil.rmtree(res + '/mipmap-anydpi-v26', ignore_errors=True)
+for d in glob.glob('native/icons/mipmap-*'):
+    for f in glob.glob(d + '/*.png'):
+        os.makedirs(res + '/' + os.path.basename(d), exist_ok=True)
+        shutil.copy(f, res + '/' + os.path.basename(d) + '/' + os.path.basename(f))
+for f in glob.glob(res + '/drawable*/splash.png'):
+    shutil.copy('native/icons/splash.png', f)
 print('android project patched')

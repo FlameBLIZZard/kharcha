@@ -92,7 +92,7 @@ final class Overlay {
         LinearLayout card = new LinearLayout(wctx);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(wctx, 16), dp(wctx, 14), dp(wctx, 16), dp(wctx, 14));
-        card.setBackground(box(Color.parseColor("#191B20"), dp(wctx, 22), Color.parseColor("#2D3038")));
+        card.setBackground(box(Color.parseColor("#0A0A0A"), dp(wctx, 22), Color.parseColor("#262626")));
         root.addView(card, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
 
         TextView title = new TextView(wctx);
@@ -103,7 +103,7 @@ final class Overlay {
         card.addView(title);
         TextView sub = new TextView(wctx);
         sub.setText("What was it for?");
-        sub.setTextColor(Color.parseColor("#959AA6"));
+        sub.setTextColor(Color.parseColor("#8A8A8A"));
         sub.setTextSize(13);
         card.addView(sub);
 
@@ -120,8 +120,8 @@ final class Overlay {
             @Override public void run() {
                 for (int i = 0; i < chips.size(); i++) {
                     boolean on = cats.get(i)[0].equals(sel[0]);
-                    chips.get(i).setBackground(box(Color.parseColor(on ? "#3DDC97" : "#22252C"), dp(wctx, 16), 0));
-                    chips.get(i).setTextColor(Color.parseColor(on ? "#04170E" : "#EEF0F4"));
+                    chips.get(i).setBackground(box(Color.parseColor(on ? "#FFFFFF" : "#1A1A1A"), dp(wctx, 16), 0));
+                    chips.get(i).setTextColor(Color.parseColor(on ? "#000000" : "#FFFFFF"));
                 }
             }
         };
@@ -144,13 +144,13 @@ final class Overlay {
 
         final EditText note = new EditText(wctx);
         note.setHint("Add a note (optional)");
-        note.setHintTextColor(Color.parseColor("#959AA6"));
+        note.setHintTextColor(Color.parseColor("#8A8A8A"));
         note.setTextColor(Color.WHITE);
         note.setTextSize(15);
         note.setSingleLine(true);
         note.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         note.setPadding(dp(wctx, 14), dp(wctx, 10), dp(wctx, 14), dp(wctx, 10));
-        note.setBackground(box(Color.parseColor("#22252C"), dp(wctx, 14), 0));
+        note.setBackground(box(Color.parseColor("#1A1A1A"), dp(wctx, 14), 0));
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         np.topMargin = dp(wctx, 10);
         card.addView(note, np);
@@ -164,13 +164,13 @@ final class Overlay {
 
         TextView skip = new TextView(wctx);
         skip.setText("Not mine");
-        skip.setTextColor(Color.parseColor("#959AA6"));
+        skip.setTextColor(Color.parseColor("#8A8A8A"));
         skip.setTextSize(14);
         skip.setPadding(dp(wctx, 6), dp(wctx, 10), dp(wctx, 14), dp(wctx, 10));
         buttons.addView(skip);
         TextView full = new TextView(wctx);
         full.setText("Open app ›");
-        full.setTextColor(Color.parseColor("#6AA8FF"));
+        full.setTextColor(Color.parseColor("#BDBDBD"));
         full.setTextSize(14);
         full.setPadding(dp(wctx, 6), dp(wctx, 10), dp(wctx, 6), dp(wctx, 10));
         buttons.addView(full);
@@ -178,12 +178,12 @@ final class Overlay {
         buttons.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
         TextView save = new TextView(wctx);
         save.setText("Save");
-        save.setTextColor(Color.parseColor("#04170E"));
+        save.setTextColor(Color.parseColor("#000000"));
         save.setTextSize(16);
         save.setTypeface(Typeface.DEFAULT_BOLD);
         save.setGravity(Gravity.CENTER);
         save.setPadding(dp(wctx, 34), dp(wctx, 11), dp(wctx, 34), dp(wctx, 11));
-        save.setBackground(box(Color.parseColor("#3DDC97"), dp(wctx, 16), 0));
+        save.setBackground(box(Color.parseColor("#FFFFFF"), dp(wctx, 16), 0));
         buttons.addView(save);
 
         final WindowManager.LayoutParams p = new WindowManager.LayoutParams(
