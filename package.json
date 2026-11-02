@@ -1,0 +1,8 @@
+{
+  "name": "kharcha",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Log an expense in two taps, and save before you spend. Installable offline web app.",
+  "scripts": { "test": "node tests/parse.test.mjs", "start": "python -m http.server 8080" },
+  "license": "MIT"
+}
