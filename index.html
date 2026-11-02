@@ -196,13 +196,44 @@ html.sheet-open .toast.show { transform: translateX(-50%); }
 .toast.act { pointer-events: auto; }
 .list .item .btn.ghost { min-width: 40px; min-height: 40px; }
 /* type roles: Fraunces italic for titles, Space Grotesk for big numbers, JetBrains Mono for small caps labels */
-.top .hi, .onb h1, .sheet h3 { font-family: var(--display); font-style: italic; font-weight: 600; letter-spacing: -.02em; }
+.top .hi, .onb h1, .onb2 h1, .sheet h3 { font-family: var(--display); font-style: italic; font-weight: 600; letter-spacing: -.02em; }
 .top .hi { font-size: 27px; line-height: 1.1; } .onb h1 { font-size: 38px; line-height: 1.08; }
 .hero .big, .amount .val, .stat .v { font-family: var(--num); letter-spacing: -.045em; }
 h2, .hero .label, .stat .k, .day, .field label, .week .l, nav.tabs button, .small-caps { font-family: var(--mono); font-weight: 500; }
 h2, .day, .field label, .hero .label, .stat .k { letter-spacing: .1em; font-size: 10.5px; }
 nav.tabs button { font-size: 10px; letter-spacing: 0; }
 .week .l { font-size: 10px; }
+/* first-run flow */
+.onb2 { position: relative; min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; padding: calc(24px + env(safe-area-inset-top)) 18px 28px; animation: up .7s var(--spring) both; }
+.glow { position: fixed; inset: 0; pointer-events: none; z-index: -1; background: radial-gradient(60% 40% at 50% -5%, color-mix(in srgb, var(--ink) 16%, transparent), transparent 70%); }
+.prog { display: flex; gap: 6px; margin-bottom: 28px; } .prog i { flex: 1; height: 3px; border-radius: 9px; background: var(--line); overflow: hidden; position: relative; }
+.prog i::after { content: ""; position: absolute; inset: 0; background: var(--ink); transform: scaleX(0); transform-origin: left; transition: transform .7s var(--spring); } .prog i.on::after { transform: none; }
+.mark { font-family: var(--display); font-style: italic; font-weight: 700; font-size: 64px; line-height: 1; letter-spacing: -.04em; margin: 0; }
+.mark span { display: inline-block; animation: blink 1.6s steps(2) infinite; } @keyframes blink { 50% { opacity: 0; } }
+.tag { color: var(--mute); font-size: 17px; margin: 10px 0 26px; }
+.demo { position: relative; height: 214px; margin: 0 0 14px; }
+.demo .pop { position: absolute; left: 0; right: 0; top: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 14px 16px; box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 12%, transparent); animation: popIn 7s var(--spring) infinite; }
+.demo .pop .t { font-family: var(--num); font-weight: 700; font-size: 22px; letter-spacing: -.03em; } .demo .pop .u { color: var(--mute); font-size: 12.5px; margin-top: 1px; }
+.demo .opts { display: flex; gap: 7px; margin-top: 12px; } .demo .opts b { font-size: 13px; font-weight: 650; padding: 8px 13px; border-radius: 14px; background: var(--panel-2); }
+.demo .opts b.pick { animation: pickIt 7s var(--spring) infinite; }
+.demo .go { margin-top: 12px; display: flex; justify-content: flex-end; } .demo .go em { font-style: normal; font-weight: 700; font-size: 14px; padding: 9px 26px; border-radius: 14px; background: var(--ink); color: var(--bg); animation: pressIt 7s var(--spring) infinite; }
+.demo .done { position: absolute; left: 0; right: 0; top: 0; height: 128px; border-radius: 22px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 18px; opacity: 0; animation: doneIn 7s var(--spring) infinite; }
+.demo .cap { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; color: var(--mute); font-size: 12.5px; font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+@keyframes popIn { 0% { opacity: 0; transform: translateY(28px) scale(.97); } 8%, 78% { opacity: 1; transform: none; } 90%, 100% { opacity: 0; transform: translateY(-10px) scale(.98); } }
+@keyframes pickIt { 0%, 30% { background: var(--panel-2); color: var(--ink); transform: none; } 36%, 100% { background: var(--ink); color: var(--bg); transform: scale(1.06); } }
+@keyframes pressIt { 0%, 50% { transform: none; } 54% { transform: scale(.9); } 60%, 100% { transform: none; } }
+@keyframes doneIn { 0%, 55% { opacity: 0; transform: scale(.96); } 62%, 78% { opacity: 1; transform: none; } 90%, 100% { opacity: 0; } }
+.bigin { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 6px 0 4px; }
+.bigin .cur { font-family: var(--num); font-size: 40px; color: var(--mute); font-weight: 500; }
+.bigin input { background: transparent; border: 0; border-bottom: 2px solid var(--line); border-radius: 0; font-family: var(--num); font-weight: 700; font-size: 56px; letter-spacing: -.05em; text-align: center; padding: 4px 0; width: 100%; max-width: 260px; }
+.bigin input::-webkit-inner-spin-button, .bigin input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; } .bigin input { -moz-appearance: textfield; appearance: textfield; }
+.bigin input:focus { background: transparent; border-color: var(--ink); }
+.preview { text-align: center; color: var(--mute); font-size: 14px; min-height: 40px; margin: 6px 0 14px; }
+.splitbar { display: flex; height: 12px; border-radius: 99px; overflow: hidden; background: var(--panel-2); margin: 4px 0 8px; } .splitbar i { display: block; background: var(--ink); transition: width .6s var(--spring); } .splitbar b { flex: 1; background: repeating-linear-gradient(135deg, var(--mute) 0 3px, transparent 3px 7px); opacity: .5; }
+.splitlbl { display: flex; justify-content: space-between; font-size: 12.5px; font-family: var(--mono); color: var(--mute); }
+.ideas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 18px; }
+.ideas button { background: var(--panel-2); border-radius: 16px; padding: 12px 4px; font-size: 12.5px; font-weight: 650; display: flex; flex-direction: column; align-items: center; gap: 4px; } .ideas button span { font-size: 24px; filter: grayscale(1) contrast(1.15); }
+.ideas button.on { background: var(--ink); color: var(--bg); } .ideas button.on span { filter: grayscale(1) invert(1); }
 @media (min-width: 700px) { body { font-size: 16px; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
@@ -794,31 +825,59 @@ function viewSettings() {
 }
 
 /* ---------- onboarding ---------- */
-let onb = { step: 0, name: '', income: '', save: '', goal: '', goalTarget: '' };
+let onb = { step: 0, name: '', income: '', save: '', goal: '', goalTarget: '', goalEmoji: '🎯' };
+function onbSplit() {
+  const inc = +onb.income || 0, sv = onb.save === '' ? Math.round(inc * .2) : Math.min(+onb.save || 0, inc);
+  return { inc, sv, spend: Math.max(0, inc - sv), pct: inc ? Math.round(sv / inc * 100) : 0 };
+}
+function onbPreview() {
+  const el = document.getElementById('o-prev'); if (!el) return;
+  const { inc, sv, spend, pct } = onbSplit();
+  if (!inc) { el.innerHTML = 'Type what lands in your account each month.'; const b = document.getElementById('o-bar'); if (b) b.style.width = '0%'; return; }
+  const per = Math.round(spend / 30);
+  el.innerHTML = `<b style="color:var(--ink)">${S.settings.currency}${spend.toLocaleString('en-IN')}</b> to spend, about <b style="color:var(--ink)">${S.settings.currency}${per.toLocaleString('en-IN')}</b> a day`;
+  const bar = document.getElementById('o-bar'); if (bar) bar.style.width = pct + '%';
+  const l = document.getElementById('o-lbl'); if (l) l.innerHTML = `<span>Saved first ${S.settings.currency}${sv.toLocaleString('en-IN')} · ${pct}%</span><span>Yours to spend</span>`;
+  document.querySelectorAll('[data-pct]').forEach(b => b.classList.toggle('sel', +b.dataset.pct === pct));
+}
 function renderOnboarding() {
-  const s = onb.step;
-  const dots = `<div class="dots">${[0, 1, 2].map(i => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div>`;
-  let h = `<div class="wrap onb">${dots}`;
-  if (s === 0) h += `<div class="logo">🪙</div><h1>Spend less without thinking about it.</h1>
-    <p>Kharcha pops up after every payment so logging takes two taps, and it nudges you to save before you spend.</p>
+  const s = onb.step, cur = S.settings.currency;
+  const prog = `<div class="prog">${[0, 1, 2].map(i => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div>`;
+  let h = `<div class="glow"></div><div class="wrap onb2">${prog}`;
+  if (s === 0) h += `<div class="mark">Kharcha<span>.</span></div>
+    <div class="tag">Know where it goes. Keep what you can.</div>
+    <div class="demo" aria-hidden="true">
+      <div class="pop"><div class="t">${cur}250 · Zomato</div><div class="u">What was it for?</div>
+        <div class="opts"><b class="pick">🍔 Food</b><b>🛍️ Shopping</b><b>⛽ Petrol</b></div><div class="go"><em>Save</em></div></div>
+      <div class="done">Saved ✓ ${cur}1,043 left today</div>
+      <div class="cap">Two taps. That's the whole job.</div></div>
     <div class="field"><label>What should I call you?</label><input id="o-name" value="${esc(onb.name)}" placeholder="Your name" autocomplete="given-name"></div>
     <button class="btn primary block" data-onb="next">Let's go</button>`;
   if (s === 1) {
-    const inc = +onb.income || 0, sv = onb.save === '' ? Math.round(inc * .2) : +onb.save;
-    h += `<div class="logo">🏦</div><h1>Pay yourself first.</h1>
-    <p>Decide how much to save the moment money comes in. Whatever is left is yours to spend, guilt-free.</p>
-    <div class="field"><label>Monthly income (after tax)</label><input id="o-income" type="number" inputmode="decimal" value="${esc(onb.income)}" placeholder="e.g. 40000"></div>
-    <div class="field"><label>Save this much first, every month</label><input id="o-save" type="number" inputmode="decimal" value="${inc ? sv : ''}" placeholder="20% is a great start"></div>
-    <div class="row" style="gap:8px;margin-bottom:16px">${[10, 20, 30].map(p => `<button class="chip" data-pct="${p}">${p}%</button>`).join('')}</div>
+    const { inc, pct } = onbSplit();
+    h += `<h1 style="font-size:38px;line-height:1.08;margin:0 0 6px">Pay yourself <br>first.</h1>
+    <p style="color:var(--mute);margin:0 0 18px">Save the moment money lands. What's left is yours to spend, guilt-free.</p>
+    <div class="field" style="margin-bottom:0"><label style="text-align:center">Monthly income after tax</label></div>
+    <div class="bigin"><span class="cur">${cur}</span><input id="o-income" type="number" inputmode="decimal" value="${esc(onb.income)}" placeholder="40000"></div>
+    <div class="preview" id="o-prev"></div>
+    <div class="splitbar"><i id="o-bar" style="width:${pct}%"></i><b></b></div><div class="splitlbl" id="o-lbl"></div>
+    <div class="row" style="gap:8px;margin:16px 0 8px;justify-content:center">${[10, 20, 30].map(p => `<button class="chip ${p === pct ? 'sel' : ''}" data-pct="${p}">Save ${p}%</button>`).join('')}</div>
+    <div class="field"><label style="text-align:center">Or an exact amount to save</label><input id="o-save" type="number" inputmode="decimal" value="${inc ? onbSplit().sv : ''}" placeholder="e.g. 8000" style="text-align:center"></div>
     <div class="two"><button class="btn" data-onb="skip">Skip for now</button><button class="btn primary" data-onb="next">Next</button></div>`;
   }
-  if (s === 2) h += `<div class="logo">🎯</div><h1>What are you saving for?</h1>
-    <p>A goal makes saying no a lot easier. You can add more later.</p>
-    <div class="field"><label>Goal</label><input id="o-goal" value="${esc(onb.goal)}" placeholder="e.g. Goa trip, new phone, emergency fund"></div>
-    <div class="field"><label>Amount</label><input id="o-goalt" type="number" inputmode="decimal" value="${esc(onb.goalTarget)}" placeholder="e.g. 25000"></div>
-    <div class="two"><button class="btn" data-onb="finish-skip">Skip</button><button class="btn primary" data-onb="finish">Start saving</button></div>`;
+  if (s === 2) {
+    const ideas = [['✈️', 'Trip'], ['📱', 'New phone'], ['🏍️', 'Vehicle'], ['🛡️', 'Emergency fund'], ['🏠', 'Home'], ['🎓', 'Learning']];
+    h += `<h1 style="font-size:38px;line-height:1.08;margin:0 0 6px">What are you <br>saving for?</h1>
+    <p style="color:var(--mute);margin:0 0 18px">A goal makes saying no easier. Add more any time.</p>
+    <div class="ideas">${ideas.map(([e, n]) => `<button data-goalpick="${e}|${n}" class="${onb.goal === n ? 'on' : ''}"><span>${e}</span>${n}</button>`).join('')}</div>
+    <div class="field"><label>Goal name</label><input id="o-goal" value="${esc(onb.goal)}" placeholder="e.g. Goa trip with friends"></div>
+    <div class="field" style="margin-bottom:0"><label style="text-align:center">How much?</label></div>
+    <div class="bigin"><span class="cur">${cur}</span><input id="o-goalt" type="number" inputmode="decimal" value="${esc(onb.goalTarget)}" placeholder="25000"></div>
+    <div class="two" style="margin-top:18px"><button class="btn" data-onb="finish-skip">Skip</button><button class="btn primary" data-onb="finish">Start saving</button></div>`;
+  }
   h += `</div>`;
   $('#app').innerHTML = h;
+  if (s === 1) onbPreview();
 }
 function onbRead() {
   const v = id => { const e = document.getElementById(id); return e ? e.value.trim() : null; };
@@ -1254,7 +1313,8 @@ document.addEventListener('click', e => {
   if (t.dataset.tog) { toggleSetting(t.dataset.tog); return; }
   if (t.dataset.hist) { histFilter = t.dataset.hist; render(); return; }
   if (t.dataset.themeBtn) { S.settings.theme = t.dataset.themeBtn; save(); render(); return; }
-  if (t.dataset.pct) { onbRead(); onb.save = String(Math.round((+onb.income || 0) * t.dataset.pct / 100)); renderOnboarding(); return; }
+  if (t.dataset.pct) { onbRead(); onb.save = String(Math.round((+onb.income || 0) * t.dataset.pct / 100)); const si = document.getElementById('o-save'); if (si) si.value = onb.save; onbPreview(); tick(8); return; }
+  if (t.dataset.goalpick) { onbRead(); const [e, n] = t.dataset.goalpick.split('|'); onb.goal = n === 'Trip' ? 'Trip' : n; onb.goalEmoji = e; renderOnboarding(); const g = document.getElementById('o-goalt'); if (g) g.focus(); return; }
   if (t.dataset.onb) {
     onbRead(); const a = t.dataset.onb;
     if (a === 'next') { onb.step++; renderOnboarding(); }
@@ -1262,8 +1322,8 @@ document.addEventListener('click', e => {
     if (a === 'finish' || a === 'finish-skip') {
       S.settings.name = onb.name; S.settings.income = +onb.income || 0;
       S.settings.saveTarget = onb.income ? (onb.save === '' ? Math.round(S.settings.income * .2) : +onb.save || 0) : 0;
-      if (a === 'finish' && onb.goal && +onb.goalTarget) S.goals.push({ id: uid(), name: onb.goal, emoji: '🎯', target: +onb.goalTarget, deadline: '' });
-      S.settings.onboarded = true; S.created = Date.now(); save(); go('home');
+      if (a === 'finish' && onb.goal && +onb.goalTarget) S.goals.push({ id: uid(), name: onb.goal, emoji: onb.goalEmoji || '🎯', target: +onb.goalTarget, deadline: '' });
+      S.settings.onboarded = true; S.created = Date.now(); save(); go('home'); if (a === 'finish') setTimeout(confetti, 350);
       if (S.settings.saveTarget) setTimeout(() => toast('First move: save ' + money(S.settings.saveTarget, { dec: false }) + ' before you spend anything'), 400);
     }
     return;
@@ -1364,13 +1424,14 @@ document.addEventListener('click', e => {
     case 'export': S.settings.lastBackup = Date.now(); save(); download('kharcha-backup-' + new Date().toLocaleDateString('en-CA') + '.json', JSON.stringify(S), 'application/json'); break;
     case 'import': importJson(); break;
     case 'csv': exportCsv(); break;
-    case 'reset': if (confirm('Erase all expenses, goals and settings on this phone?') && confirm('Really? This cannot be undone.')) { localStorage.removeItem(KEY); S = freshState(); onb = { step: 0, name: '', income: '', save: '', goal: '', goalTarget: '' }; render(); } break;
+    case 'reset': if (confirm('Erase all expenses, goals and settings on this phone?') && confirm('Really? This cannot be undone.')) { localStorage.removeItem(KEY); S = freshState(); onb = { step: 0, name: '', income: '', save: '', goal: '', goalTarget: '', goalEmoji: '🎯' }; render(); } break;
   }
 });
 $('#scrim').addEventListener('click', closeSheet);
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'histq') { histQuery = t.value; const pos = t.selectionStart; render(); const n = $('#histq'); n.focus(); n.setSelectionRange(pos, pos); return; }
+  if (t.id === 'o-income' || t.id === 'o-save') { onbRead(); if (t.id === 'o-income' && onb.save !== '' && document.activeElement === t) { /* keep an explicit save amount */ } onbPreview(); return; }
   if (t.dataset.catbudget) { const c = S.cats.find(x => x.id === t.dataset.catbudget); c.budget = +t.value || 0; save(); }
 });
 document.addEventListener('change', e => {
