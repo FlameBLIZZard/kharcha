@@ -777,6 +777,7 @@ function viewSettings() {
     ${togRow('notifMonthly', 'Monthly recap', 'How last month went, on the 1st.', S.settings.notifMonthly !== false)}
     ${togRow('autoBackup', 'Weekly auto-backup', S.settings.lastAuto ? 'Last saved ' + relDay(S.settings.lastAuto) + ' to Downloads/Kharcha.' : 'Saves a backup file to Downloads/Kharcha each week.', S.settings.autoBackup !== false)}
     ${togRow('lock', 'App lock', 'Ask for your phone\'s fingerprint, PIN or pattern when Kharcha opens.', !!S.settings.lock)}
+    <button class="btn block" style="margin:10px 0 8px" data-act="previewnotif">Preview the notifications now</button>
     <div class="small muted" style="margin-top:6px">Home-screen widget: long-press your home screen, tap <b>Widgets</b>, find <b>Kharcha</b>.</div></div>` : ''}
   <h2>App</h2><div class="card">
     <div class="field"><label>Theme</label><div class="seg" style="margin:0">${['dark', 'light'].map(t => `<button data-theme-btn="${t}" class="${(st.theme || 'dark') === t ? 'on' : ''}">${t === 'dark' ? 'Dark' : 'Light'}</button>`).join('')}</div></div>
@@ -1077,13 +1078,14 @@ function startupSheets() {
 let appInfo = '', pushT = null;
 function recapPayload() {
   const now = Date.now(), c = calc(), pp = period(new Date(+c.p.start - DAY));
-  const wk = S.tx.filter(t => t.ts >= now - 7 * DAY), pw = S.tx.filter(t => t.ts >= now - 14 * DAY && t.ts < now - 7 * DAY);
+  const mon = startOfDay(now); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));   // this week, Monday to now
+  const wk = S.tx.filter(t => t.ts >= +mon), pw = S.tx.filter(t => t.ts >= +mon - 7 * DAY && t.ts < +mon);
   const byCat = {}; wk.forEach(t => byCat[t.cat] = (byCat[t.cat] || 0) + t.amt);
   const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
   return { currency: S.settings.currency, weekSpent: Math.round(sum(wk.map(t => t.amt))), prevWeekSpent: Math.round(sum(pw.map(t => t.amt))),
     topCategory: top ? catById(top[0]).name : '', monthSpent: Math.round(c.spent),
     prevMonthSpent: Math.round(sum(S.tx.filter(t => inRange(t.ts, pp.start, pp.end)).map(t => t.amt))),
-    savedThisMonth: Math.round(c.savedP), skippedThisMonth: Math.round(c.skippedP), asOf: now };
+    savedThisMonth: Math.round(c.savedP), skippedThisMonth: Math.round(c.skippedP), asOf: now, startDay: Math.min(28, Math.max(1, S.settings.startDay | 0 || 1)) };
 }
 function pushNative() {
   try { if (!KN) return; } catch (e) { return; }
@@ -1192,7 +1194,7 @@ async function nativeSync() {
     syncCats();
     nat = await KN.status();
     if (nat.notifications) KN.showQuickAdd().catch(() => {});
-    if (KN.appInfo) KN.appInfo().then(r => { appInfo = ' · build ' + r.versionName + (r.versionCode ? ' (' + r.versionCode + ')' : ''); }).catch(() => {});
+    if (KN.appInfo) KN.appInfo().then(r => { appInfo = ' · build ' + r.versionName; }).catch(() => {});
     autoBackup();
     if ((tab === 'settings' || tab === 'home') && !draft) render();
   } catch (e) {}
@@ -1269,6 +1271,7 @@ document.addEventListener('click', e => {
     case 'cashsave': { const amt = +$('#k-amt').value; if (!amt) { toast('How much did you withdraw?'); break; } S.cash.push({ id: uid(), amt, ts: Date.now(), note: $('#k-note').value.trim() }); save(); closeSheet(); render(); toast('Cash wallet: ' + money(cashBalance(), { dec: false })); break; }
     case 'cashdel': S.cash = S.cash.filter(x => x.id !== id); save(); render(); break;
     case 'wrap': wrapSheet(); break;
+    case 'previewnotif': pushNative(); setTimeout(() => { KN && KN.previewSchedule ? KN.previewSchedule().then(() => toast('Check your notifications'), () => toast('Allow notifications first')) : toast('Needs the updated Android app'); }, 900); break;
     case 'whatsnew': whatsNew(); break;
     case 'wrapshare': { const t = wrapText(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied. Paste it anywhere'), () => toast('Could not copy')); break; }
     case 'toastact': { const f = toast._fn; toast._fn = null; $('#toast').classList.remove('show'); if (f) f(); break; }
