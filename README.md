@@ -20,6 +20,10 @@ Everything stays on your phone. No account, no server, no bank login.
 
 ## Install on Android
 
+**Easiest: the APK.** On your phone, open the repo's **Releases** page, download `Kharcha.apk`, tap it to install (allow *install unknown apps* if asked). Works fully offline. Popup link for MacroDroid is `kharcha://add?text=` + the notification text. The APK is built by `.github/workflows/apk.yml` (Actions → *Build Android APK* → Run workflow).
+
+**Or as a web app:**
+
 1. Open the app's URL in Chrome.
 2. Menu (⋮) → **Install app** (or *Add to Home screen*).
 3. Follow **Setup → Auto-popup on Android** inside the app. Short version is in [docs/android-auto-popup.md](docs/android-auto-popup.md).

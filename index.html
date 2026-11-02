@@ -407,7 +407,8 @@ function viewGoals() {
   return h;
 }
 
-function appUrl() { return location.href.split('#')[0].split('?')[0]; }
+const IS_APP = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+function appUrl() { return IS_APP ? 'kharcha://add?text=' : location.href.split('#')[0].split('?')[0] + '#add?text='; }
 function viewSettings() {
   const st = S.settings, base = appUrl();
   let h = `<div class="top"><div class="hi">Setup</div></div>
@@ -425,11 +426,11 @@ function viewSettings() {
   <h2>Auto-popup on Android</h2><div class="card">
     <p style="margin-top:0">Make Kharcha pop up by itself every time Google Pay, PhonePe, Paytm or your bank tells you money left your account.</p>
     <ol class="steps small">
-      <li><b>Install Kharcha</b> to your home screen: open the browser menu and tap <i>Install app</i> or <i>Add to Home screen</i>.</li>
+      <li>${IS_APP ? '<b>Kharcha is installed</b> as an app. The link below opens it directly.' : '<b>Install Kharcha</b> to your home screen: open the browser menu and tap <i>Install app</i> or <i>Add to Home screen</i>.'}</li>
       <li>Install <b>MacroDroid</b> (free) from the Play Store and give it <i>Notification access</i> when it asks.</li>
       <li>New macro. <b>Trigger:</b> Device events → Notification → <i>Notification received</i>. Pick your UPI and bank apps (and Messages for bank SMS). Text filter: <i>Contains</i> <code>debited</code>, <code>paid</code>, <code>sent</code> (use "any of").</li>
       <li><b>Action:</b> Applications → <i>Open website / HTTP GET</i> → Open website, and paste this URL. Tap the <i>…</i> button to insert the magic text <code>{notification}</code> at the end:
-        <div class="code" style="margin-top:6px">${esc(base)}#add?text=</div>
+        <div class="code" style="margin-top:6px">${esc(base)}</div>
         <button class="btn block" style="margin-top:8px" data-act="copyurl">Copy URL</button></li>
       <li>Save. Next payment, Kharcha opens with the amount filled in and a category guessed. Pick a category, add a note, tap Save. Done in two taps.</li>
     </ol>
@@ -713,7 +714,7 @@ document.addEventListener('click', e => {
       save(); closeSheet(); render(); break;
     }
     case 'catdel': if (confirm('Delete this category? Its expenses move to Other.')) { S.tx.forEach(x => { if (x.cat === id) x.cat = 'other'; }); S.cats = S.cats.filter(c => c.id !== id); save(); closeSheet(); render(); } break;
-    case 'copyurl': { const u = appUrl() + '#add?text='; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('Copied. Paste it in MacroDroid.'), () => prompt('Copy this URL', u)); break; }
+    case 'copyurl': { const u = appUrl(); (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('Copied. Paste it in MacroDroid.'), () => prompt('Copy this URL', u)); break; }
     case 'smstest': { const v = $('#smstest').value.trim(); if (!v) { toast('Paste an SMS first'); break; } location.hash = '#add?text=' + encodeURIComponent(v); break; }
     case 'export': download('kharcha-backup-' + new Date().toLocaleDateString('en-CA') + '.json', JSON.stringify(S), 'application/json'); break;
     case 'import': importJson(); break;
@@ -749,6 +750,16 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && !d
 
 render();
 handleIncoming();
+// Android app: kharcha://add?text=... from MacroDroid
+if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {
+  let lastUrl = '';
+  const openUrl = u => {
+    if (!u || u === lastUrl || !u.startsWith('kharcha://')) return; lastUrl = u;
+    history.replaceState(null, '', '#add?' + u.split('?').slice(1).join('?')); handleIncoming();
+  };
+  Capacitor.Plugins.App.addListener('appUrlOpen', e => openUrl(e.url));
+  Capacitor.Plugins.App.getLaunchUrl().then(r => r && openUrl(r.url)).catch(() => {});
+}
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
