@@ -203,6 +203,27 @@ h2, .hero .label, .stat .k, .day, .field label, .week .l, nav.tabs button, .smal
 h2, .day, .field label, .hero .label, .stat .k { letter-spacing: .1em; font-size: 10.5px; }
 nav.tabs button { font-size: 10px; letter-spacing: 0; }
 .week .l { font-size: 10px; }
+/* compact add sheet: must fit without scrolling */
+.sheet { padding-top: 6px; }
+.grab { margin: 0 auto 8px; }
+.sheet .amount { padding: 2px 0 0; }
+.sheet .amount .val { font-size: clamp(42px, 7.2dvh, 60px); }
+.sheet .amount .hint { min-height: 16px; font-size: 12.5px; margin-top: 0; }
+.cats { display: flex; gap: 8px; overflow-x: auto; margin: 8px -18px; padding: 2px 18px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.cats::-webkit-scrollbar { display: none; }
+.cat { flex: 0 0 auto; min-width: 72px; flex-direction: row; gap: 7px; padding: 10px 14px; border-radius: 16px; font-size: 13px; scroll-snap-align: start; }
+.cat .e { font-size: 18px; }
+.cat.on { transform: none; }
+.sheet input#note { padding: 11px 14px; margin: 4px 0 8px !important; }
+.whenchip { margin: 0 0 8px; gap: 8px; flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; justify-content: flex-start; }
+.whenchip::-webkit-scrollbar { display: none; }
+.whenchip .chip { flex: none; padding: 7px 12px; font-size: 12.5px; }
+.rthumb { width: 34px; height: 34px; border-radius: 10px; object-fit: cover; flex: none; }
+.pad { gap: 5px; margin: 4px 0 8px; }
+.pad button { height: clamp(40px, 6.3dvh, 54px); padding: 0; font-size: 22px; border-radius: 15px; }
+.sheet .actions { padding-top: 6px; }
+.sheet .actions .btn { padding-top: 13px; padding-bottom: 13px; }
+.seg.dir { margin-bottom: 2px; } .seg.dir button { padding: 6px; font-size: 12.5px; }
 /* first-run flow */
 .onb2 { position: relative; min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; padding: calc(24px + env(safe-area-inset-top)) 18px 28px; animation: up .7s var(--spring) both; }
 .glow { position: fixed; inset: 0; pointer-events: none; z-index: -1; background: radial-gradient(60% 40% at 50% -5%, color-mix(in srgb, var(--ink) 16%, transparent), transparent 70%); }
@@ -933,6 +954,7 @@ function renderAdd() {
   const dt = new Date(d.ts);
   const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
   const share = d.split > 1 && amt ? Math.round(amt / d.split * 100) / 100 : 0;
+  const keepScroll = (document.querySelector('#sheet .cats') || {}).scrollLeft || 0;
   openSheet(`
     ${d.editing ? '' : `<div class="seg dir"><button data-dir="out" class="${isIn ? '' : 'on'}">Spent</button><button data-dir="in" class="${isIn ? 'on' : ''}">Received</button></div>`}
     <div class="amount"><div class="val ${amt ? '' : 'zero'}"><span class="cur">${esc(S.settings.currency)}</span>${d.amtStr ? Number(d.amtStr.replace(/\.$/, '')).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + (d.amtStr.endsWith('.') ? '.' : '') : '0'}</div><div class="hint">${hint}</div></div>
@@ -942,12 +964,12 @@ function renderAdd() {
     ${catBudgetHint}
     <input id="note" placeholder="${isIn ? 'Note (e.g. salary, Amazon refund)' : 'Note (what was it?)'}" value="${esc(d.note)}" maxlength="80" autocomplete="off" style="margin:8px 0 10px">
     ${d.more ? `<div class="modes">${['UPI', 'Card', 'Cash'].map(m => `<button data-mode="${m}" class="${d.mode === m ? 'on' : ''}">${m}</button>`).join('')}<input id="when" type="datetime-local" value="${local}" style="flex:1.6;padding:6px 8px;font-size:13px"></div>`
-      : `<div class="whenchip" style="gap:8px;flex-wrap:wrap"><button class="chip" data-act="addmore">${relDay(d.ts)} ${timeStr(d.ts)}${isIn ? '' : ' · ' + esc(d.mode)} ▾</button>${isIn ? '' : `<button class="chip" data-act="splitcycle">${d.split > 1 ? `Split ${d.split} ways · yours ${money(share)}` : 'Split bill'}</button>`}${isIn || d.photo ? '' : `<button class="chip" data-act="attach">📎 Receipt</button>`}</div>`}
-    ${d.photo ? `<img id="rimg" class="rimg" data-act="viewphoto" alt="Receipt">` : ''}
+      : `<div class="whenchip" style="gap:8px;flex-wrap:wrap"><button class="chip" data-act="addmore">${relDay(d.ts)} ${timeStr(d.ts)}${isIn ? '' : ' · ' + esc(d.mode)} ▾</button>${isIn ? '' : `<button class="chip" data-act="splitcycle">${d.split > 1 ? `Split ${d.split} ways · yours ${money(share)}` : 'Split bill'}</button>`}${isIn ? '' : d.photo ? `<img id="rimg" class="rthumb" data-act="viewphoto" alt="Receipt">` : `<button class="chip" data-act="attach">📎 Receipt</button>`}</div>`}
     <div class="pad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map(k => `<button data-key="${k}">${k}</button>`).join('')}</div>
     <div class="actions">${d.editing ? `<button class="btn danger" data-act="deltx">Delete</button>` : isIn ? `<button class="btn" data-act="close">Cancel</button>` : `<button class="btn" data-act="skip" title="You were going to buy it, and didn't">Skipped it <span class="gs">💪</span></button>`}
       <button class="btn primary" data-act="savetx">${d.editing ? 'Update' : 'Save'}</button></div>
-    ${d.editing || isIn ? '' : '<div class="small muted" style="text-align:center;margin-top:10px">Were going to buy it and didn\'t? Tap <b>Skipped it</b> to bank the money.</div>'}`);
+`);
+  { const cr = document.querySelector('#sheet .cats'); if (cr) { if (keepScroll) cr.scrollLeft = keepScroll; else { const on = cr.querySelector('.cat.on'); if (on) cr.scrollLeft = Math.max(0, on.getBoundingClientRect().left - cr.getBoundingClientRect().left + cr.scrollLeft - 18); } } }
   if (d.photo) loadRimg();
   // do not steal focus on phones; the numpad is the input
 }
