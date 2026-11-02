@@ -409,6 +409,18 @@ function viewGoals() {
 
 const IS_APP = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
 function appUrl() { return IS_APP ? 'kharcha://add?text=' : location.href.split('#')[0].split('?')[0] + '#add?text='; }
+function nativeCard() {
+  const ok = nat.listener && nat.notifications;
+  return `<h2>Auto-popup</h2><div class="card ${ok ? '' : 'savefirst'}">
+    <div class="row"><div class="emoji">${ok ? '✅' : '🔔'}</div><div class="grow"><div class="bold">${ok ? 'Auto-detect is on' : 'Turn on auto-detect'}</div>
+    <div class="small muted">Kharcha reads payment notifications from BHIM, GPay, PhonePe, Paytm, your bank and SMS. When one arrives, a popup appears with one-tap save buttons. Nothing leaves your phone.</div></div></div>
+    <ol class="steps small" style="margin-bottom:0">
+      <li class="${nat.listener ? 'ok' : ''}">${nat.listener ? '✓ Notification access is on' : 'Allow <b>Notification access</b> for Kharcha: <button class="btn small" data-act="natlisten">Open settings</button><br><span class="muted">Android may call it a restricted setting. If the switch is greyed out: Settings → Apps → Kharcha → ⋮ → Allow restricted settings.</span>'}</li>
+      <li class="${nat.notifications ? 'ok' : ''}">${nat.notifications ? '✓ Popups are allowed' : 'Allow Kharcha to show popups: <button class="btn small" data-act="natnotif">Allow</button>'}</li>
+      <li>Keep it alive: <button class="btn small" data-act="natbattery">Battery settings</button> <span class="muted">choose Unrestricted for Kharcha so Android doesn't stop it.</span></li>
+    </ol>
+    <button class="btn block" style="margin-top:12px" data-act="nattest">Send a test popup</button></div>`;
+}
 function viewSettings() {
   const st = S.settings, base = appUrl();
   let h = `<div class="top"><div class="hi">Setup</div></div>
@@ -423,7 +435,8 @@ function viewSettings() {
   <h2>Category budgets</h2><div class="card list">${S.cats.map(ct => `<div class="item"><div class="emoji">${ct.emoji}</div><div class="grow bold">${esc(ct.name)}</div><input data-catbudget="${ct.id}" type="number" inputmode="decimal" value="${ct.budget || ''}" placeholder="No limit" style="width:120px;text-align:right"><button class="btn ghost" data-act="catedit" data-id="${ct.id}" aria-label="Edit category">✎</button></div>`).join('')}
     <div class="item"><button class="btn block" data-act="catnew">＋ Add a category</button></div></div>
 
-  <h2>Auto-popup on Android</h2><div class="card">
+  ${IS_APP ? nativeCard() : ''}
+  <h2>${IS_APP ? 'Other ways to add (optional)' : 'Auto-popup on Android'}</h2><div class="card" ${IS_APP ? 'hidden' : ''}>
     <p style="margin-top:0">Make Kharcha pop up by itself every time Google Pay, PhonePe, Paytm or your bank tells you money left your account.</p>
     <ol class="steps small">
       <li>${IS_APP ? '<b>Kharcha is installed</b> as an app. The link below opens it directly.' : '<b>Install Kharcha</b> to your home screen: open the browser menu and tap <i>Install app</i> or <i>Add to Home screen</i>.'}</li>
@@ -648,10 +661,29 @@ function handleIncoming() {
   const P = window.KharchaParse.parse(raw);
   const amount = parseFloat(params.get('amount')) || P.amount || 0;
   const merchant = params.get('merchant') || P.merchant || '';
-  const cat = window.KharchaParse.guessCategory(merchant + ' ' + raw);
+  const cat = params.get('cat') || window.KharchaParse.guessCategory(merchant + ' ' + raw);
   fromLink = !!raw || !!amount;
-  openAdd({ amount, note: params.get('note') || merchant, cat: S.cats.some(c => c.id === cat) ? cat : '', src: raw ? 'auto' : 'manual', kind: P.kind === 'credit' ? 'credit' : '', raw });
+  openAdd({ amount, note: params.get('note') || merchant, cat: S.cats.some(c => c.id === cat) ? cat : '', src: (raw || params.get('cat')) ? 'auto' : 'manual', kind: P.kind === 'credit' ? 'credit' : '', raw });
   return true;
+}
+
+/* ---------- Android app: payment notifications ---------- */
+const KN = IS_APP && window.Capacitor.Plugins ? window.Capacitor.Plugins.KharchaNative : null;
+let nat = { listener: false, notifications: false };
+async function nativeSync() {
+  if (!KN) return;
+  try {
+    const r = await KN.drain();
+    let added = 0;
+    (r.items || []).forEach(it => {
+      if (S.tx.some(t => t.id === it.id)) return;
+      S.tx.push({ id: it.id, amt: it.amt, cat: S.cats.some(c => c.id === it.cat) ? it.cat : 'other', note: it.note || '', mode: 'UPI', ts: it.ts, src: 'notif' });
+      added++;
+    });
+    if (added) { save(); render(); toast(added + ' expense' + (added > 1 ? 's' : '') + ' saved from notifications'); }
+    nat = await KN.status();
+    if (tab === 'settings' && !draft) render();
+  } catch (e) {}
 }
 
 /* ---------- events ---------- */
@@ -714,6 +746,10 @@ document.addEventListener('click', e => {
       save(); closeSheet(); render(); break;
     }
     case 'catdel': if (confirm('Delete this category? Its expenses move to Other.')) { S.tx.forEach(x => { if (x.cat === id) x.cat = 'other'; }); S.cats = S.cats.filter(c => c.id !== id); save(); closeSheet(); render(); } break;
+    case 'natlisten': KN && KN.openAccessSettings(); break;
+    case 'natnotif': KN && KN.requestNotifications().then(() => setTimeout(nativeSync, 1500)); break;
+    case 'natbattery': KN && KN.openBatterySettings(); break;
+    case 'nattest': KN && (nat.notifications ? KN.test().then(() => toast('Check your notifications')) : toast('Allow popups first')); break;
     case 'copyurl': { const u = appUrl(); (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('Copied. Paste it in MacroDroid.'), () => prompt('Copy this URL', u)); break; }
     case 'smstest': { const v = $('#smstest').value.trim(); if (!v) { toast('Paste an SMS first'); break; } location.hash = '#add?text=' + encodeURIComponent(v); break; }
     case 'export': download('kharcha-backup-' + new Date().toLocaleDateString('en-CA') + '.json', JSON.stringify(S), 'application/json'); break;
@@ -746,7 +782,7 @@ document.addEventListener('keydown', e => {
 })();
 window.addEventListener('hashchange', () => { if (location.hash.startsWith('#add')) handleIncoming(); });
 // refresh numbers when the app comes back to the front (day may have changed)
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); render(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); render(); nativeSync(); } });
 
 render();
 handleIncoming();
@@ -758,6 +794,7 @@ if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {
     history.replaceState(null, '', '#add?' + u.split('?').slice(1).join('?')); handleIncoming();
   };
   Capacitor.Plugins.App.addListener('appUrlOpen', e => openUrl(e.url));
+  nativeSync();
   Capacitor.Plugins.App.getLaunchUrl().then(r => r && openUrl(r.url)).catch(() => {});
 }
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});

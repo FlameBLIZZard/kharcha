@@ -24,21 +24,7 @@ jobs:
       - name: Create the Android project
         run: |
           npx cap add android
-          # kharcha://add?text=... opens the quick-add popup (use it in MacroDroid)
-          python3 - <<'PY'
-          p = 'android/app/src/main/AndroidManifest.xml'
-          s = open(p).read()
-          link = '''
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="kharcha" />
-            </intent-filter>
-          '''
-          i = s.index('</activity>')
-          open(p, 'w').write(s[:i] + link + s[i:])
-          PY
+          python3 scripts/patch-android.py
           npx cap sync android
       - name: Build debug APK
         working-directory: android
@@ -52,5 +38,5 @@ jobs:
           name: Kharcha ${{ inputs.tag || github.ref_name }}
           body: |
             Download **Kharcha.apk** below on your Android phone and tap it to install (allow "install unknown apps" for your browser when asked).
-            Works fully offline. Popup link for MacroDroid: `kharcha://add?text=` + the notification text.
+            Works fully offline. Open Kharcha → Setup → Auto-popup and switch on Notification access.
           files: Kharcha.apk

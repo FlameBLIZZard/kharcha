@@ -20,7 +20,7 @@ Everything stays on your phone. No account, no server, no bank login.
 
 ## Install on Android
 
-**Easiest: the APK.** On your phone, open the repo's **Releases** page, download `Kharcha.apk`, tap it to install (allow *install unknown apps* if asked). Works fully offline. Popup link for MacroDroid is `kharcha://add?text=` + the notification text. The APK is built by `.github/workflows/apk.yml` (Actions → *Build Android APK* → Run workflow).
+**Easiest: the APK.** On your phone, open the repo's **Releases** page, download `Kharcha.apk`, tap it to install (allow *install unknown apps* if asked). Works fully offline. In the APK, turn on **Setup → Auto-popup** (Notification access) and Kharcha shows a popup with one-tap save buttons whenever a payment notification arrives (BHIM, GPay, PhonePe, Paytm, banks, SMS). No other app needed. The APK is built by `.github/workflows/apk.yml` (Actions → *Build Android APK* → Run workflow).
 
 **Or as a web app:**
 
