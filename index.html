@@ -152,6 +152,22 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .92em; backgro
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin: 0 -18px; padding-left: 18px; padding-right: 18px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chip.sel { background: var(--ink); color: var(--bg); }
+.dbars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 110px; margin-top: 16px; }
+.dbars .db { flex: 1; background: color-mix(in srgb, var(--ink) 30%, var(--panel-2)); border-radius: 3px 3px 0 0; transform-origin: bottom; animation: rise .8s var(--spring) both; }
+.dbars .db.today { background: var(--ink); } .dbars .db.future { opacity: .35; }
+.dbars .bline { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--ink); z-index: 1; pointer-events: none; }
+.chart { width: 100%; height: 130px; margin-top: 12px; overflow: visible; }
+.chart .ln { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: draw 1.4s var(--spring) forwards; }
+.chart .ln.dash { stroke: var(--mute); stroke-width: 1.6; stroke-dasharray: 5 5; animation: none; stroke-dashoffset: 0; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.donut { width: 128px; height: 128px; flex: none; }
+.legend .row { padding: 5px 0; gap: 8px; } .legend .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.actions .btn { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+.cat.new { background: transparent; border: 1.5px dashed var(--mute); color: var(--mute); }
+.sheet .actions { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom)); margin: 0 -18px; padding: 12px 18px calc(18px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 14px); z-index: 2; }
+html.sheet-open .toast { bottom: auto; top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%) translateY(-24px) scale(.96); }
+html.sheet-open .toast.show { transform: translateX(-50%); }
+@media (max-height: 760px) { .pad button { padding: 10px 0; font-size: 21px; } .amount .val { font-size: 52px; } .cat { padding: 7px 2px; } .cats { margin: 8px 0; } }
 .week { display: flex; gap: 8px; height: 96px; margin-top: 16px; }
 .week .d { flex: 1; display: grid; grid-template-rows: 1fr auto; gap: 6px; min-width: 0; }
 .week .track { display: flex; align-items: flex-end; }
@@ -375,7 +391,7 @@ function countUps() {
 }
 
 /* ---------- routing / render ---------- */
-let tab = 'home', histFilter = 'all', histQuery = '', histCat = '';
+let tab = 'home', histFilter = 'all', histQuery = '', histCat = '', histView = 'list';
 function go(t) { tab = t; render(true); window.scrollTo(0, 0); }
 function render(enter) {
   document.documentElement.dataset.theme = S.settings.theme || 'dark';
@@ -488,7 +504,66 @@ function txRow(t) {
     <div class="small muted">${esc(ct.name)} · ${relDay(t.ts)} ${timeStr(t.ts)}${t.mode ? ' · ' + esc(t.mode) : ''}</div></div><div class="bold num">${money(t.amt)}</div></button>`;
 }
 
+function histToggle() { return `<div class="seg">${[['list', 'List'], ['insights', 'Insights']].map(([k, l]) => `<button data-hview="${k}" class="${histView === k ? 'on' : ''}">${l}</button>`).join('')}</div>`; }
+/* ---------- insights: graphs ---------- */
+const shade = i => `color-mix(in srgb, var(--ink) ${[100, 74, 54, 40, 29, 21, 15][Math.min(i, 6)]}%, var(--panel-2))`;
+function viewInsights() {
+  if (S.tx.length < 2) return `<div class="empty">Log a few expenses and your graphs show up here.</div>`;
+  const p = period(), c = calc(), todayI = Math.min(p.days - 1, Math.floor((+startOfDay(Date.now()) - +p.start) / DAY));
+  const per = Array.from({ length: p.days }, () => 0);
+  c.txP.forEach(t => { const i = Math.floor((+startOfDay(t.ts) - +p.start) / DAY); if (i >= 0 && i < p.days) per[i] += t.amt; });
+  const dailyBudget = c.spendable ? c.spendable / p.days : 0;
+  let h = '';
+
+  // 1. daily bars with budget line
+  const mx = Math.max(...per, dailyBudget, 1);
+  h += `<h2>Every day this month</h2><div class="card"><div class="row"><div class="grow bold">${money(c.spent, { dec: false })}</div>${dailyBudget ? `<div class="small muted">dashed line = ${money(dailyBudget, { dec: false })} a day</div>` : ''}</div>
+    <div class="dbars" role="img" aria-label="Spending for each day of the period">${dailyBudget ? `<i class="bline" style="bottom:${dailyBudget / mx * 100}%"></i>` : ''}${per.map((v, i) => `<div class="db ${i === todayI ? 'today' : ''} ${i > todayI ? 'future' : ''}" style="height:${v ? Math.max(3, v / mx * 100) : 1.5}%;animation-delay:${i * 12}ms"></div>`).join('')}</div>
+    <div class="row small muted" style="margin-top:6px"><span class="grow">${p.start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span><span>${new Date(+p.end - DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span></div></div>`;
+
+  // 2. cumulative vs pace
+  const W = 300, H = 120, cum = []; per.slice(0, todayI + 1).reduce((a, v, i) => (cum[i] = a + v), 0);
+  const top = Math.max(c.spendable || 0, cum[cum.length - 1] || 0, 1);
+  const X = i => (i / Math.max(1, p.days - 1)) * W, Y = v => H - 6 - (v / top) * (H - 14);
+  const actual = cum.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ');
+  const pace = c.spendable ? `<path d="M0 ${Y(0)} L${W} ${Y(c.spendable)}" class="ln dash"/>` : '';
+  const ahead = c.spendable ? c.spendable * (todayI + 1) / p.days - (cum[todayI] || 0) : 0;
+  h += `<h2>Pace</h2><div class="card"><div class="bold">${c.spendable ? (ahead >= 0 ? money(ahead, { dec: false }) + ' under pace' : money(-ahead, { dec: false }) + ' over pace') : 'Running total'}</div>
+    <div class="small muted">${c.spendable ? 'Solid = what you spent so far. Dashed = an even spread of your monthly limit.' : 'Add your income in Setup to see an even-pace line.'}</div>
+    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Running total of spending against an even pace">${pace}<path d="${actual}" class="ln"/>${cum.length ? `<circle cx="${X(todayI)}" cy="${Y(cum[todayI])}" r="4" fill="var(--ink)"/>` : ''}</svg></div>`;
+
+  // 3. category donut
+  const byCat = {}; c.txP.forEach(t => byCat[t.cat] = (byCat[t.cat] || 0) + t.amt);
+  const rows = Object.entries(byCat).sort((a, b) => b[1] - a[1]), total = sum(rows.map(r => r[1]));
+  if (total) {
+    const R = 42, C = 2 * Math.PI * R; let off = 0;
+    const segs = rows.map(([id, v], i) => { const len = v / total * C, el = `<circle cx="60" cy="60" r="${R}" fill="none" stroke="${shade(i)}" stroke-width="16" stroke-dasharray="${Math.max(0, len - 1.5)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"/>`; off += len; return el; }).join('');
+    h += `<h2>Where it goes</h2><div class="card"><div class="row" style="gap:18px;align-items:center"><svg viewBox="0 0 120 120" class="donut" role="img" aria-label="Share of spending by category">${segs}<text x="60" y="58" text-anchor="middle" font-size="9" fill="var(--mute)">spent</text><text x="60" y="73" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${money(total, { dec: false })}</text></svg>
+      <div class="grow legend">${rows.slice(0, 6).map(([id, v], i) => `<div class="row small"><i class="sw" style="background:${shade(i)}"></i><span class="grow ellipsis">${catById(id).emoji} ${esc(catById(id).name)}</span><span class="bold num">${Math.round(v / total * 100)}%</span></div>`).join('')}</div></div></div>`;
+  }
+
+  // 4. weekday pattern, last 8 weeks
+  const wd = Array.from({ length: 7 }, () => 0), since = Date.now() - 56 * DAY;
+  S.tx.filter(t => t.ts >= since).forEach(t => { wd[(new Date(t.ts).getDay() + 6) % 7] += t.amt; });
+  const wavg = wd.map(v => v / 8), wm = Math.max(...wavg, 1), busy = wavg.indexOf(Math.max(...wavg));
+  if (sum(wd)) h += `<h2>Your week</h2><div class="card"><div class="bold">${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][busy]}s cost you the most</div><div class="small muted">Average spend per weekday, last 8 weeks</div>
+    <div class="week" style="height:90px">${wavg.map((v, i) => `<div class="d ${i === busy ? 'today' : ''}"><div class="track"><div class="b" style="height:${Math.max(4, v / wm * 100)}%;animation-delay:${i * 50}ms"></div></div><div class="l">${'MTWTFSS'[i]}</div></div>`).join('')}</div></div>`;
+
+  // 5. last 6 months
+  const months = []; let ref = new Date();
+  for (let i = 0; i < 6; i++) { const q = period(ref); months.unshift({ q, v: sum(S.tx.filter(t => inRange(t.ts, q.start, q.end)).map(t => t.amt)) }); ref = new Date(+q.start - DAY); }
+  const mm = Math.max(...months.map(m => m.v), 1);
+  if (months.filter(m => m.v).length > 1) h += `<h2>Month by month</h2><div class="card"><div class="week" style="height:110px">${months.map((m, i) => `<div class="d ${i === 5 ? 'today' : ''}"><div class="track"><div class="b" style="height:${Math.max(4, m.v / mm * 100)}%;animation-delay:${i * 60}ms"></div></div><div class="l">${m.q.start.toLocaleDateString('en-IN', { month: 'short' })}</div></div>`).join('')}</div>
+    <div class="small muted" style="margin-top:10px">This month so far: ${money(months[5].v, { dec: false })} · last month: ${money(months[4].v, { dec: false })}</div></div>`;
+
+  // 6. top spends
+  const by = {}; c.txP.forEach(t => { const k = (t.note || '').trim().toLowerCase(); if (!k) return; const e = by[k] || (by[k] = { name: t.note.trim(), v: 0, n: 0 }); e.v += t.amt; e.n++; });
+  const topS = Object.values(by).sort((a, b) => b.v - a.v).slice(0, 5);
+  if (topS.length) h += `<h2>Biggest this month</h2><div class="card list">${topS.map((e, i) => `<div class="item"><div class="emoji">${i + 1}</div><div class="grow"><div class="bold ellipsis">${esc(e.name)}</div><div class="small muted">${e.n} time${e.n > 1 ? 's' : ''}</div></div><div class="bold num">${money(e.v, { dec: false })}</div></div>`).join('')}</div>`;
+  return h;
+}
 function viewHistory() {
+  if (histView === 'insights') return `<div class="top"><div class="hi">History</div></div>${histToggle()}${viewInsights()}`;
   const p = period();
   let list = [...S.tx];
   if (histFilter === 'month') list = list.filter(t => inRange(t.ts, p.start, p.end));
@@ -500,7 +575,7 @@ function viewHistory() {
   if (histCat) list = list.filter(t => t.cat === histCat);
   list.sort((a, b) => b.ts - a.ts);
   let h = `<div class="top"><div class="hi">History</div><span class="chip">${money(sum(list.map(t => t.amt)))}</span></div>
-    <div class="seg">${[['all', 'All'], ['month', 'This month'], ['week', '7 days']].map(([k, l]) => `<button data-hist="${k}" class="${histFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${histToggle()}<div class="seg">${[['all', 'All'], ['month', 'This month'], ['week', '7 days']].map(([k, l]) => `<button data-hist="${k}" class="${histFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <input type="search" id="histq" placeholder="Search notes, categories, amounts" value="${esc(histQuery)}" style="margin-bottom:10px">${chips}`;
   if (!list.length) return h + `<div class="empty">Nothing here yet.</div>`;
   let cur = '', group = [];
@@ -658,9 +733,11 @@ let draft = null;
 function openSheet(html) {
   $('#sheetInner').innerHTML = '<div class="grab"></div>' + html;
   const sc = $('#scrim'), sh = $('#sheet');
+  document.documentElement.classList.add('sheet-open');
   sc.hidden = false; requestAnimationFrame(() => { sc.classList.add('show'); sh.classList.add('show'); });
 }
 function closeSheet() {
+  document.documentElement.classList.remove('sheet-open');
   $('#scrim').classList.remove('show'); $('#sheet').classList.remove('show');
   setTimeout(() => { $('#scrim').hidden = true; }, 220);
   draft = null;
@@ -694,7 +771,7 @@ function renderAdd() {
   openSheet(`
     <div class="amount"><div class="val ${amt ? '' : 'zero'}"><span class="cur">${esc(S.settings.currency)}</span>${d.amtStr ? Number(d.amtStr.replace(/\.$/, '')).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + (d.amtStr.endsWith('.') ? '.' : '') : '0'}</div><div class="hint">${hint}</div></div>
     ${notice}
-    <div class="cats">${S.cats.map(x => `<button class="cat ${d.cat === x.id ? 'on' : ''}" data-cat="${x.id}"><span class="e">${x.emoji}</span>${esc(x.name)}</button>`).join('')}</div>
+    <div class="cats">${S.cats.map(x => `<button class="cat ${d.cat === x.id ? 'on' : ''}" data-cat="${x.id}"><span class="e">${x.emoji}</span>${esc(x.name)}</button>`).join('')}<button class="cat new" data-act="catnew-add"><span class="e">＋</span>New</button></div>
     ${catBudgetHint}
     <input id="note" placeholder="Note (what was it?)" value="${esc(d.note)}" maxlength="80" autocomplete="off" style="margin:8px 0 10px">
     <div class="modes">${['UPI', 'Card', 'Cash'].map(m => `<button data-mode="${m}" class="${d.mode === m ? 'on' : ''}">${m}</button>`).join('')}<input id="when" type="datetime-local" value="${local}" style="flex:1.6;padding:6px 8px;font-size:13px"></div>
@@ -767,7 +844,8 @@ function depositForm(g, first) {
     ${S.goals.length ? `<div class="field"><label>Towards</label><select id="d-goal">${S.goals.map(x => `<option value="${x.id}" ${g && x.id === g.id ? 'selected' : ''}>${esc(x.emoji)} ${esc(x.name)}</option>`).join('')}<option value="">General savings</option></select></div>` : ''}
     <div class="actions"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="depositsave" data-kind="${first ? 'first' : 'manual'}">Log it</button></div>`);
 }
-function catForm(ct) {
+function catForm(ct, back) {
+  catForm.back = back || null;
   const isNew = !ct; ct = ct || { id: uid(), name: '', emoji: '🏷️', budget: 0 };
   openSheet(`<h3 style="margin:4px 0 14px">${isNew ? 'New category' : 'Edit category'}</h3>
     <div class="two"><div class="field"><label>Emoji</label><input id="c-emoji" value="${esc(ct.emoji)}" maxlength="4"></div><div class="field"><label>Monthly budget</label><input id="c-budget" type="number" inputmode="decimal" value="${ct.budget || ''}" placeholder="No limit"></div></div>
@@ -851,6 +929,7 @@ document.addEventListener('click', e => {
   if (t.dataset.key) { tick(); padKey(t.dataset.key); return; }
   if (t.dataset.cat && draft) { tick(10); syncDraftInputs(); draft.cat = draft.cat === t.dataset.cat ? '' : t.dataset.cat; renderAdd(); return; }
   if (t.dataset.mode && draft) { syncDraftInputs(); draft.mode = t.dataset.mode; renderAdd(); return; }
+  if (t.dataset.hview) { histView = t.dataset.hview; render(true); return; }
   if (t.dataset.hcat !== undefined) { histCat = t.dataset.hcat; render(); return; }
   if (t.dataset.hist) { histFilter = t.dataset.hist; render(); return; }
   if (t.dataset.themeBtn) { S.settings.theme = t.dataset.themeBtn; save(); render(); return; }
@@ -881,7 +960,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'toastact': { const f = toast._fn; toast._fn = null; $('#toast').classList.remove('show'); if (f) f(); break; }
-    case 'close': closeSheet(); break;
+    case 'close': if (catForm.back) { const d = catForm.back; catForm.back = null; draft = d; renderAdd(); } else closeSheet(); break;
     case 'newgoal': goalForm(); break;
     case 'goaledit': goalForm(S.goals.find(g => g.id === id)); break;
     case 'goalsave': {
@@ -909,8 +988,11 @@ document.addEventListener('click', e => {
       const name = $('#c-name').value.trim(); if (!name) { toast('Name it'); break; }
       const ct = S.cats.find(x => x.id === id) || (S.cats.splice(S.cats.length - 1, 0, { id }), S.cats.find(x => x.id === id));
       Object.assign(ct, { name, emoji: $('#c-emoji').value.trim() || '🏷️', budget: +$('#c-budget').value || 0 });
-      save(); syncCats(); closeSheet(); render(); break;
+      save(); syncCats();
+      if (catForm.back) { const d = catForm.back; catForm.back = null; d.cat = ct.id; draft = d; renderAdd(); render(); toast('Added ' + ct.name); break; }
+      closeSheet(); render(); break;
     }
+    case 'catnew-add': { syncDraftInputs(); catForm(null, draft); break; }
     case 'subnew': subForm(); break;
     case 'subedit': subForm(S.subs.find(x => x.id === id)); break;
     case 'subsave': {
