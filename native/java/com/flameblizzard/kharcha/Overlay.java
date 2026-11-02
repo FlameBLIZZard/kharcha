@@ -163,13 +163,13 @@ final class Overlay {
         skip.setText("Not mine");
         skip.setTextColor(Color.parseColor("#8A8A8A"));
         skip.setTextSize(14);
-        skip.setPadding(dp(wctx, 6), dp(wctx, 10), dp(wctx, 14), dp(wctx, 10));
+        skip.setPadding(dp(wctx, 8), dp(wctx, 14), dp(wctx, 16), dp(wctx, 14));
         buttons.addView(skip);
         TextView full = new TextView(wctx);
         full.setText("Open app ›");
         full.setTextColor(Color.parseColor("#BDBDBD"));
         full.setTextSize(14);
-        full.setPadding(dp(wctx, 6), dp(wctx, 10), dp(wctx, 6), dp(wctx, 10));
+        full.setPadding(dp(wctx, 8), dp(wctx, 14), dp(wctx, 8), dp(wctx, 14));
         buttons.addView(full);
         View spacer = new View(wctx);
         buttons.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
@@ -242,7 +242,10 @@ final class Overlay {
             }
         });
 
+        root.setAlpha(0f);
+        root.setTranslationY(dp(wctx, 36));
         wm.addView(root, p);
+        root.animate().alpha(1f).translationY(0f).setDuration(240).start();
         current = root;
         currentWm = wm;
         final View mine = root;
