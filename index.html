@@ -466,6 +466,8 @@ function render(enter) {
   document.documentElement.dataset.theme = S.settings.theme || 'dark';
   document.querySelector('meta[name=theme-color]').content = S.settings.theme === 'light' ? '#ffffff' : '#000000';
   if (!S.settings.onboarded) { $('#tabs').hidden = true; renderOnboarding(); return; }
+  if (IS_APP && KN && !natLoaded) { $('#tabs').hidden = true; $('#app').innerHTML = ''; return; }   // wait for the permission check
+  if (permNeeded()) { $('#tabs').hidden = true; renderPerms(); return; }
   $('#tabs').hidden = false;
   document.querySelectorAll('#tabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const v = { home: viewHome, history: viewHistory, goals: viewGoals, settings: viewSettings }[tab]();
@@ -1124,6 +1126,25 @@ async function toggleSetting(key) {
 }
 const togRow = (key, label, desc, on) => `<div class="tog"><div class="grow"><div class="bold">${label}</div><div class="small muted">${desc}</div></div><button class="chip ${on ? 'sel' : ''}" data-tog="${key}">${on ? 'On' : 'Off'}</button></div>`;
 
+/* ---------- permissions screen (Android app) ---------- */
+let natLoaded = true;   // flipped to false at startup inside the Android app, until the first status check lands
+const permsOk = () => nat.listener && nat.notifications && nat.overlay;
+function permNeeded() { return !!(IS_APP && KN && natLoaded && !S.settings.permLater && !permsOk()); }
+function renderPerms() {
+  const row = (ok, title, desc, act, label) => `<div class="card" style="margin-bottom:10px"><div class="row"><div class="emoji">${ok ? '✅' : '○'}</div><div class="grow"><div class="bold">${title}</div><div class="small muted">${desc}</div></div>${ok ? '' : `<button class="btn small primary" data-act="${act}">${label}</button>`}</div></div>`;
+  const n = [nat.listener, nat.notifications, nat.overlay].filter(Boolean).length;
+  $('#app').innerHTML = `<div class="wrap onb"><div class="dots">${[0, 1, 2].map(i => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</div>
+    <h1>Let Kharcha catch your payments.</h1>
+    <p>Three switches, once. Everything stays on this phone, and Kharcha never reads your screen, so BHIM stays happy.</p>
+    ${row(nat.listener, 'Notification access', 'Lets Kharcha see UPI and bank alerts so it can ask what each payment was for.', 'natlisten', 'Turn on')}
+    ${nat.listener ? '' : '<div class="small muted" style="margin:-4px 4px 12px">If the switch is greyed out: Settings → Apps → Kharcha → ⋮ → Allow restricted settings.</div>'}
+    ${row(nat.notifications, 'Show notifications', 'For the ₹ Add shortcut and the quick popups.', 'natnotif', 'Allow')}
+    ${row(nat.overlay, 'Display over other apps', 'The floating card on top of BHIM, so you never switch apps.', 'natoverlay', 'Turn on')}
+    <div class="card" style="margin-bottom:10px"><div class="row"><div class="emoji">🔋</div><div class="grow"><div class="bold">Battery: Unrestricted <span class="muted small">(optional)</span></div><div class="small muted">Stops Android from putting Kharcha to sleep.</div></div><button class="btn small" data-act="natbattery">Open</button></div></div>
+    <div class="card" style="margin-bottom:18px"><div class="row"><div class="emoji">${S.settings.lock ? '✅' : '🔒'}</div><div class="grow"><div class="bold">App lock <span class="muted small">(optional)</span></div><div class="small muted">Ask for your fingerprint, face or PIN when Kharcha opens.</div></div>${S.settings.lock ? '' : '<button class="btn small" data-tog="lock">Turn on</button>'}</div></div>
+    <div class="two"><button class="btn" data-act="permlater">Later</button><button class="btn primary" data-act="permdone" ${permsOk() ? '' : 'disabled style="opacity:.4"'}>Done</button></div></div>`;
+}
+
 /* ---------- import / export ---------- */
 function download(name, text, type) {
   if (typeof KN !== 'undefined' && KN && KN.saveText) {   // the Android app: WebViews cannot download blobs
@@ -1179,6 +1200,7 @@ function handleIncoming() {
 /* ---------- Android app: payment notifications ---------- */
 const KN = IS_APP && window.Capacitor.Plugins ? window.Capacitor.Plugins.KharchaNative : null;
 let nat = { listener: false, notifications: false, overlay: false };
+if (IS_APP && KN) natLoaded = false;
 function syncCats() { if (KN) KN.setCats({ cats: S.cats.map(c => ({ id: c.id, name: c.name })) }).catch(() => {}); }
 async function nativeSync() {
   if (!KN) return;
@@ -1199,11 +1221,13 @@ async function nativeSync() {
     if (added) { save(); render(); toast(added + ' expense' + (added > 1 ? 's' : '') + ' saved from notifications'); }
     syncCats();
     nat = await KN.status();
+    natLoaded = true;
+    if (permsOk() && S.settings.permLater) { S.settings.permLater = false; save(); }   // switches are on again: ask next time one goes off
     if (nat.notifications) KN.showQuickAdd().catch(() => {});
     if (KN.appInfo) KN.appInfo().then(r => { appInfo = ' · build ' + r.versionName; }).catch(() => {});
     autoBackup();
-    if ((tab === 'settings' || tab === 'home') && !draft) render();
-  } catch (e) {}
+    if ((tab === 'settings' || tab === 'home' || permNeeded()) && !draft) render();
+  } catch (e) { natLoaded = true; if (!draft) render(); }
 }
 
 /* ---------- events ---------- */
@@ -1327,6 +1351,8 @@ document.addEventListener('click', e => {
     }
     case 'subdel': S.subs = S.subs.filter(x => x.id !== id); save(); closeSheet(); render(); toast('Removed'); break;
     case 'catdel': if (confirm('Delete this category? Its expenses move to Other.')) { S.tx.forEach(x => { if (x.cat === id) x.cat = 'other'; }); S.cats = S.cats.filter(c => c.id !== id); save(); syncCats(); closeSheet(); render(); } break;
+    case 'permlater': S.settings.permLater = true; save(); render(true); break;
+    case 'permdone': if (permsOk()) render(true); break;
     case 'natlisten': KN && KN.openAccessSettings(); break;
     case 'natoverlay': KN && KN.openOverlaySettings(); break;
     case 'natnotif': KN && KN.requestNotifications().then(() => setTimeout(nativeSync, 1500)); break;
@@ -1387,6 +1413,7 @@ if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {
   nativeSync();
   Capacitor.Plugins.App.getLaunchUrl().then(r => r && openUrl(r.url)).catch(() => {});
 }
+setTimeout(() => { if (!natLoaded) { natLoaded = true; render(); } }, 2500);   // never leave the screen blank
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
