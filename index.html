@@ -172,6 +172,13 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .92em; backgro
 .whenchip { display: flex; justify-content: center; margin: 2px 0 10px; }
 @keyframes pulse { 0%, 100% { transform: none; } 50% { transform: scale(1.06); } }
 .btn.pulse { animation: pulse .45s var(--spring) 2; }
+.seg.dir { margin: 0 0 4px; } .seg.dir button { padding: 7px; }
+.rimg { display: block; width: 100%; max-height: 110px; object-fit: cover; border-radius: 14px; margin: 0 0 10px; }
+.lightbox { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.94); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 18px; }
+.lightbox img { max-width: 100%; max-height: 78vh; border-radius: 14px; }
+.lightbox .btn { color: #fff; background: #222; }
+.tog { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.tog:first-child { border-top: 0; }
 .cat.new { background: transparent; border: 1.5px dashed var(--mute); color: var(--mute); }
 .sheet .actions { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom)); margin: 0 -18px; padding: 12px 18px calc(18px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 14px); z-index: 2; }
 html.sheet-open .toast { bottom: auto; top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%) translateY(-24px) scale(.96); }
@@ -231,7 +238,7 @@ const DEFAULT_CATS = [
 ];
 function freshState() {
   return { v: 1, created: Date.now(), settings: { name: '', income: 0, saveTarget: 0, startDay: 1, currency: '₹', theme: 'dark', onboarded: false, bestStreak: 0 },
-    cats: DEFAULT_CATS.map(c => ({ ...c })), tx: [], goals: [], saves: [], subs: [] };
+    cats: DEFAULT_CATS.map(c => ({ ...c })), tx: [], goals: [], saves: [], subs: [], inc: [], ious: [], cash: [] };
 }
 function load() {
   try {
@@ -299,6 +306,51 @@ function confetti() {
 }
 
 /* ---------- money maths ---------- */
+/* ---------- income, cash, IOUs, receipts ---------- */
+const INC_KINDS = [['salary', 'Salary', '💼'], ['refund', 'Refund', '↩️'], ['cashback', 'Cashback', '🎁'], ['other', 'Other', '✨']];
+const incKind = k => INC_KINDS.find(x => x[0] === k) || INC_KINDS[3];
+const cashBalance = () => sum((S.cash || []).map(x => x.amt)) - sum(S.tx.filter(t => t.mode === 'Cash').map(t => t.amt));
+const openIous = () => (S.ious || []).filter(x => !x.settled);
+const owedToMe = () => sum(openIous().filter(x => x.dir !== 'owe').map(x => x.amt));
+const iOwe = () => sum(openIous().filter(x => x.dir === 'owe').map(x => x.amt));
+function incRow(t) {
+  const k = incKind(t.kind);
+  return `<button class="item" data-act="edit" data-id="${t.id}"><div class="emoji">${k[2]}</div><div class="grow"><div class="bold ellipsis">${esc(t.note || k[1])}</div>
+    <div class="small muted">${k[1]} · ${relDay(t.ts)} ${timeStr(t.ts)}</div></div><div class="bold num">+${money(t.amt)}</div></button>`;
+}
+const photoDB = () => new Promise((res, rej) => { const r = indexedDB.open('kharcha-photos', 1); r.onupgradeneeded = () => r.result.createObjectStore('p'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const photoPut = (id, blob) => photoDB().then(db => new Promise((res, rej) => { const t = db.transaction('p', 'readwrite'); t.objectStore('p').put(blob, id); t.oncomplete = res; t.onerror = () => rej(t.error); }));
+const photoGet = id => photoDB().then(db => new Promise(res => { const q = db.transaction('p').objectStore('p').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); })).catch(() => null);
+const photoDel = id => photoDB().then(db => new Promise(res => { const t = db.transaction('p', 'readwrite'); t.objectStore('p').delete(id); t.oncomplete = res; t.onerror = res; })).catch(() => {});
+async function shrink(file) {
+  const bmp = await createImageBitmap(file), k = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  return new Promise(r => cv.toBlob(r, 'image/jpeg', .65));
+}
+function attachPhoto() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f || !draft) return;
+    try { const b = await shrink(f); await photoPut(draft.id, b); syncDraftInputs(); draft.photo = true; renderAdd(); }
+    catch (e) { toast('Could not use that photo'); }
+  };
+  inp.click();
+}
+async function loadRimg() {
+  const im = document.getElementById('rimg'); if (!im || !draft) return;
+  const b = await photoGet(draft.id); if (b) im.src = URL.createObjectURL(b);
+}
+async function showPhoto(id, onRemove) {
+  const b = await photoGet(id); if (!b) { toast('No photo found'); return; }
+  const url = URL.createObjectURL(b), lb = document.createElement('div'); lb.className = 'lightbox';
+  lb.innerHTML = `<img src="${url}" alt="Receipt"><div class="row"><button class="btn" data-lb="close">Close</button><button class="btn" data-lb="remove">Remove photo</button></div>`;
+  lb.addEventListener('click', async e => { const a = e.target.closest('[data-lb]'); if (!a && e.target.tagName === 'IMG') return;
+    if (a && a.dataset.lb === 'remove') { await photoDel(id); onRemove && onRemove(); }
+    URL.revokeObjectURL(url); lb.remove(); });
+  document.body.appendChild(lb);
+}
+
 /* ---------- recurring subscriptions ---------- */
 const monthKey = d => d.getFullYear() + '-' + (d.getMonth() + 1);
 const dueDate = (sub, ref) => new Date(ref.getFullYear(), ref.getMonth(), Math.min(sub.day, new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate()), 9, 0);
@@ -421,6 +473,7 @@ function render(enter) {
   const idx = { home: 0, history: 1, goals: 3, settings: 4 }[tab];
   $('#ind').style.setProperty('--i', idx);
   countUps();
+  pushNative();
 }
 
 function viewHome() {
@@ -460,6 +513,13 @@ function viewHome() {
   // stats
   h += `<div class="stats"><div class="card stat"><div class="k">Skipped buys <span class="gs">💪</span></div><div class="v ok">${money(c.skippedAll, { dec: false })}</div><div class="small muted">${c.skipCount} time${c.skipCount === 1 ? '' : 's'} you said no</div></div>
     <div class="card stat"><div class="k">Best streak</div><div class="v">${S.settings.bestStreak || st.n} day${(S.settings.bestStreak || st.n) === 1 ? '' : 's'}</div><div class="small muted">${st.mode === 'budget' ? 'under daily budget' : 'of logging'}</div></div></div>`;
+
+  // money in, owed, cash
+  const pin = (S.inc || []).filter(x => inRange(x.ts, c.p.start, c.p.end)), inSum = sum(pin.map(x => x.amt));
+  if (inSum) h += `<div class="card"><div class="row"><div class="grow"><div class="small muted">Money in this month</div><div class="bold">+${money(inSum, { dec: false })}</div></div><div style="text-align:right"><div class="small muted">Net after spending</div><div class="bold">${inSum - c.spent < 0 ? '−' : ''}${money(Math.abs(inSum - c.spent), { dec: false })}</div></div></div></div>`;
+  const ow = owedToMe(), io = iOwe();
+  if (ow || io) h += `<button class="card" style="display:block;width:100%;text-align:left" data-tab="goals"><div class="row"><div class="emoji">🤝</div><div class="grow"><div class="bold">${ow ? money(ow, { dec: false }) + ' owed to you' : money(io, { dec: false }) + ' you owe'}</div><div class="small muted">${ow && io ? money(io, { dec: false }) + ' you owe · ' : ''}Tap to see who</div></div></div></button>`;
+  if ((S.cash || []).length) h += `<button class="card" style="display:block;width:100%;text-align:left" data-tab="settings"><div class="row"><div class="emoji">💵</div><div class="grow"><div class="bold">${money(Math.max(0, cashBalance()), { dec: false })} cash in hand</div><div class="small muted">From your logged ATM withdrawals</div></div></div></button>`;
 
   // goals preview
   if (S.goals.length) {
@@ -580,9 +640,15 @@ function viewInsights() {
   if (topS.length) h += `<h2>Biggest this month</h2><div class="card list">${topS.map((e, i) => `<div class="item"><div class="emoji">${i + 1}</div><div class="grow"><div class="bold ellipsis">${esc(e.name)}</div><div class="small muted">${e.n} time${e.n > 1 ? 's' : ''}</div></div><div class="bold num">${money(e.v, { dec: false })}</div></div>`).join('')}</div>`;
   return h;
 }
+const histSeg = () => `<div class="seg">${[['all', 'All'], ['month', 'Month'], ['week', '7 days'], ['in', 'Money in']].map(([k, l]) => `<button data-hist="${k}" class="${histFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 function viewHistory() {
   if (histView === 'insights') return `<div class="top"><div class="hi">History</div></div>${histToggle()}${viewInsights()}`;
   const p = period();
+  if (histFilter === 'in') {
+    const li = [...(S.inc || [])].sort((a, b) => b.ts - a.ts);
+    return `<div class="top"><div class="hi">History</div><span class="chip">+${money(sum(li.map(x => x.amt)))}</span></div>${histToggle()}${histSeg()}` +
+      (li.length ? `<div class="card list">${li.map(incRow).join('')}</div>` : `<div class="empty">No money in yet. Tap <b>+</b> then <b>Received</b> for salary, refunds or cashback.</div>`);
+  }
   let list = [...S.tx];
   if (histFilter === 'month') list = list.filter(t => inRange(t.ts, p.start, p.end));
   if (histFilter === 'week') list = list.filter(t => t.ts >= Date.now() - 7 * DAY);
@@ -593,7 +659,7 @@ function viewHistory() {
   if (histCat) list = list.filter(t => t.cat === histCat);
   list.sort((a, b) => b.ts - a.ts);
   let h = `<div class="top"><div class="hi">History</div><span class="chip">${money(sum(list.map(t => t.amt)))}</span></div>
-    ${histToggle()}<div class="seg">${[['all', 'All'], ['month', 'This month'], ['week', '7 days']].map(([k, l]) => `<button data-hist="${k}" class="${histFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${histToggle()}${histSeg()}
     <input type="search" id="histq" placeholder="Search notes, categories, amounts" value="${esc(histQuery)}" style="margin-bottom:10px">${chips}`;
   if (!list.length) return h + `<div class="empty">Nothing here yet.</div>`;
   let cur = '', group = [];
@@ -623,6 +689,8 @@ function viewGoals() {
       <div class="small muted">${money(sv)} of ${money(g.target)}${left ? ' · ' + money(left) + ' to go' : ' · Done! 🎉'}</div>${pace ? `<div class="small muted">${pace}</div>` : ''}</div></div>
       <div class="two" style="margin-top:12px"><button class="btn" data-act="goaledit" data-id="${g.id}">Edit</button><button class="btn primary" data-act="deposit" data-id="${g.id}">Add money</button></div></div>`;
   });
+  h += `<h2>Owed</h2><div class="card list">${openIous().length ? openIous().map(o => `<div class="item"><div class="emoji">${o.dir === 'owe' ? '📤' : '📥'}</div><button class="grow" data-act="iouedit" data-id="${o.id}" style="text-align:left"><div class="bold ellipsis">${o.dir === 'owe' ? 'You owe ' : ''}${esc(o.who)}</div><div class="small muted ellipsis">${esc(o.note || 'No note')} · ${relDay(o.ts)}</div></button><div class="bold num">${money(o.amt)}</div>${o.dir === 'owe' ? '' : `<button class="btn ghost small" data-act="ioucopy" data-id="${o.id}" aria-label="Copy a reminder message">📋</button>`}<button class="btn small" data-act="iousettle" data-id="${o.id}">Settle</button></div>`).join('') : `<div class="empty" style="padding:14px 10px">Nobody owes you, and you owe nobody.</div>`}
+    <div class="item"><button class="btn block" data-act="iounew">＋ Add who owes what</button></div></div>`;
   h += `<h2>Skip jar <span class="gs">💪</span></h2><div class="card"><div class="row"><div class="emoji">🫙</div><div class="grow"><div class="bold">${money(c.skippedAll)} not spent</div>
     <div class="small muted">Every time you were about to buy something and didn't, tap <b>Skipped it</b> in the add screen. It goes here and into your first goal.</div></div></div></div>`;
   const recentSaves = [...S.saves].sort((a, b) => b.ts - a.ts).slice(0, 8);
@@ -677,7 +745,7 @@ function viewSettings() {
     <div class="field"><label>Currency symbol</label><input data-set="currency" value="${esc(st.currency)}" maxlength="4"></div></div>
     <div class="small muted">${st.income ? `You can spend ${money(Math.max(0, st.income - st.saveTarget), { dec: false })} a month, about ${money(Math.max(0, st.income - st.saveTarget) / period().days, { dec: false })} a day. Saving ${st.income ? Math.round(st.saveTarget / st.income * 100) : 0}% of income.` : 'Add your income to unlock the daily safe-to-spend number.'}</div>
   </div>
-  <h2>Subscriptions</h2><div class="card list">${(S.subs || []).map(x => `<button class="item" data-act="subedit" data-id="${x.id}"><div class="emoji">${catById(x.cat).emoji}</div><div class="grow"><div class="bold ellipsis">${esc(x.name)}</div><div class="small muted">Every month on the ${x.day}${['th','st','nd','rd'][(x.day % 10 > 3 || [11, 12, 13].includes(x.day)) ? 0 : x.day % 10]}</div></div><div class="bold num">${money(x.amt)}</div></button>`).join('')}
+  <h2>Subscriptions and bills</h2><div class="small muted" style="margin:-4px 4px 10px">Netflix, rent, EMIs, credit card: Kharcha logs them on their day and reminds you before.</div><div class="card list">${(S.subs || []).map(x => `<button class="item" data-act="subedit" data-id="${x.id}"><div class="emoji">${catById(x.cat).emoji}</div><div class="grow"><div class="bold ellipsis">${esc(x.name)}</div><div class="small muted">Every month on the ${x.day}${['th','st','nd','rd'][(x.day % 10 > 3 || [11, 12, 13].includes(x.day)) ? 0 : x.day % 10]}</div></div><div class="bold num">${money(x.amt)}</div></button>`).join('')}
     <div class="item"><button class="btn block" data-act="subnew">＋ Add a subscription</button></div></div>
   <h2>Categories and budgets</h2><div class="small muted" style="margin:-4px 4px 10px">Use ↑ to move your favourites to the top. The payment popup offers them first.</div><div class="card list">${S.cats.map(ct => `<div class="item"><div class="emoji">${ct.emoji}</div><button class="grow" data-act="catedit" data-id="${ct.id}" style="text-align:left;padding:4px 0"><div class="bold ellipsis">${esc(ct.name)}</div><div class="small muted">${ct.budget ? money(ct.budget, { dec: false }) + ' a month' : 'No budget · tap to set'}</div></button><button class="btn ghost" data-act="catup" data-id="${ct.id}" aria-label="Move up" title="Move up (popup buttons follow this order)">↑</button><button class="btn ghost" data-act="catedit" data-id="${ct.id}" aria-label="Edit category">✎</button></div>`).join('')}
     <div class="item"><button class="btn block" data-act="catnew">＋ Add a category</button></div></div>
@@ -699,14 +767,26 @@ function viewSettings() {
     <button class="btn block" data-act="smstest">Try it</button>
   </div>
 
+  <h2>Cash wallet</h2><div class="card"><div class="row"><div class="emoji">💵</div><div class="grow"><div class="bold">${(S.cash || []).length ? money(Math.max(0, cashBalance()), { dec: false }) + ' in hand' : 'Track your cash'}</div>
+    <div class="small muted">${(S.cash || []).length ? 'Withdrawals minus expenses you logged as Cash.' : 'Log ATM withdrawals and Kharcha counts down what is left.'}</div></div></div>
+    ${[...(S.cash || [])].sort((a, b) => b.ts - a.ts).slice(0, 4).map(x => `<div class="row small" style="margin-top:10px"><span class="grow muted">${relDay(x.ts)}${x.note ? ' · ' + esc(x.note) : ''}</span><span class="bold">+${money(x.amt, { dec: false })}</span><button class="btn ghost small" data-act="cashdel" data-id="${x.id}" aria-label="Remove">✕</button></div>`).join('')}
+    <button class="btn block" style="margin-top:12px" data-act="cashnew">＋ Log an ATM withdrawal</button></div>
+  ${IS_APP ? `<h2>Reminders, widget and lock</h2><div class="card">
+    ${togRow('notifBills', 'Bill reminders', 'A notification a day or two before a subscription or bill is due.', S.settings.notifBills !== false)}
+    ${togRow('notifWeekly', 'Sunday recap', 'One line about your week, Sunday evening.', S.settings.notifWeekly !== false)}
+    ${togRow('notifMonthly', 'Monthly recap', 'How last month went, on the 1st.', S.settings.notifMonthly !== false)}
+    ${togRow('autoBackup', 'Weekly auto-backup', S.settings.lastAuto ? 'Last saved ' + relDay(S.settings.lastAuto) + ' to Downloads/Kharcha.' : 'Saves a backup file to Downloads/Kharcha each week.', S.settings.autoBackup !== false)}
+    ${togRow('lock', 'App lock', 'Ask for your phone\'s fingerprint, PIN or pattern when Kharcha opens.', !!S.settings.lock)}
+    <div class="small muted" style="margin-top:6px">Home-screen widget: long-press your home screen, tap <b>Widgets</b>, find <b>Kharcha</b>.</div></div>` : ''}
   <h2>App</h2><div class="card">
     <div class="field"><label>Theme</label><div class="seg" style="margin:0">${['dark', 'light'].map(t => `<button data-theme-btn="${t}" class="${(st.theme || 'dark') === t ? 'on' : ''}">${t === 'dark' ? 'Dark' : 'Light'}</button>`).join('')}</div></div>
-    <div class="two"><button class="btn" data-act="export">Backup (JSON)</button><button class="btn" data-act="import">Restore</button></div>
+    <div class="two"><button class="btn" data-act="wrap">Last month's wrap-up</button><button class="btn" data-act="whatsnew">What's new</button></div>
+    <div class="two" style="margin-top:10px"><button class="btn" data-act="export">Backup (JSON)</button><button class="btn" data-act="import">Restore</button></div>
     <button class="btn block" style="margin-top:10px" data-act="csv">Export spreadsheet (CSV)</button>
     <button class="btn block danger" style="margin-top:10px" data-act="reset">Erase everything</button>
     <p class="small muted" style="margin-bottom:0">Everything stays on this phone. No account, no server, no bank login. Back up now and then in case you clear your browser.</p>
   </div>
-  <p class="small muted" style="text-align:center">Kharcha v1.0 · open source · MIT</p>`;
+  <p class="small muted" style="text-align:center">Kharcha v${VERSION}${appInfo} · open source · MIT</p>`;
   return h;
 }
 
@@ -763,22 +843,24 @@ function closeSheet() {
 }
 function openAdd(pre = {}) {
   const existing = pre.id ? S.tx.find(t => t.id === pre.id) : null;
-  draft = existing ? { ...existing, amtStr: String(existing.amt), editing: true } : {
-    id: uid(), amtStr: pre.amount ? String(pre.amount) : '', cat: pre.cat || '', note: pre.note || '', mode: pre.mode || 'UPI', ts: pre.ts || Date.now(), src: pre.src || 'manual', kind: pre.kind || '', raw: pre.raw || ''
-  };
+  const exInc = pre.id && !existing ? (S.inc || []).find(t => t.id === pre.id) : null;
+  draft = existing ? { ...existing, amtStr: String(existing.amt), editing: true, dir: 'out' }
+    : exInc ? { id: exInc.id, amtStr: String(exInc.amt), cat: exInc.kind, note: exInc.note || '', mode: 'UPI', ts: exInc.ts, src: 'manual', dir: 'in', editing: true }
+    : { id: uid(), amtStr: pre.amount ? String(pre.amount) : '', cat: pre.cat || '', note: pre.note || '', mode: pre.mode || 'UPI', ts: pre.ts || Date.now(), src: pre.src || 'manual', kind: pre.kind || '', raw: pre.raw || '', dir: pre.kind === 'credit' ? 'in' : 'out', split: 1 };
   renderAdd();
 }
 function renderAdd() {
-  const d = draft, c = calc();
+  const d = draft, c = calc(), isIn = d.dir === 'in';
   const amt = parseFloat(d.amtStr) || 0;
   let hint = '';
-  if (!d.editing && amt && c.income) {
+  if (isIn) hint = amt ? 'Money coming in' : 'Type the amount';
+  else if (!d.editing && amt && c.income) {
     const after = c.leftToday - amt;
     hint = after >= 0 ? `<span class="ok">${money(after, { dec: false })} left to spend today after this</span>` : `<span class="bad">This puts you ${money(-after, { dec: false })} over today's budget</span>`;
   } else if (!amt) hint = 'Type the amount';
   let notice = '';
-  if (d.kind === 'credit') notice = `<div class="notice">This looks like money <b>coming in</b>, not an expense. Close this if so.</div>`;
-  if (!d.editing && d.src !== 'manual' && amt) {
+  if (d.kind === 'credit' && !isIn) notice = `<div class="notice">This looks like money <b>coming in</b>. Tap <b>Received</b> above to log it as income.</div>`;
+  if (!isIn && !d.editing && d.src !== 'manual' && amt) {
     const dup = S.tx.find(t => Math.abs(t.amt - amt) < .01 && Math.abs(t.ts - Date.now()) < 5 * 60e3);
     if (dup) notice += `<div class="notice">You logged ${money(dup.amt)} ${Math.max(1, Math.round((Date.now() - dup.ts) / 60e3))} min ago. Same payment? Close this to avoid counting it twice.</div>`;
   }
@@ -786,18 +868,23 @@ function renderAdd() {
   const catBudgetHint = ct && ct.budget ? (() => { const s = sum(c.txP.filter(t => t.cat === ct.id && t.id !== d.id).map(t => t.amt)) + amt; return `<div class="small ${s > ct.budget ? 'bad' : 'muted'}" style="text-align:center;margin-top:-4px">${esc(ct.name)}: ${money(s)} of ${money(ct.budget, { dec: false })} this month</div>`; })() : '';
   const dt = new Date(d.ts);
   const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+  const share = d.split > 1 && amt ? Math.round(amt / d.split * 100) / 100 : 0;
   openSheet(`
+    ${d.editing ? '' : `<div class="seg dir"><button data-dir="out" class="${isIn ? '' : 'on'}">Spent</button><button data-dir="in" class="${isIn ? 'on' : ''}">Received</button></div>`}
     <div class="amount"><div class="val ${amt ? '' : 'zero'}"><span class="cur">${esc(S.settings.currency)}</span>${d.amtStr ? Number(d.amtStr.replace(/\.$/, '')).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + (d.amtStr.endsWith('.') ? '.' : '') : '0'}</div><div class="hint">${hint}</div></div>
     ${notice}
-    <div class="cats">${S.cats.map(x => `<button class="cat ${d.cat === x.id ? 'on' : ''}" data-cat="${x.id}"><span class="e">${x.emoji}</span>${esc(x.name)}</button>`).join('')}<button class="cat new" data-act="catnew-add"><span class="e">＋</span>New</button></div>
+    <div class="cats">${isIn ? INC_KINDS.map(x => `<button class="cat ${d.cat === x[0] ? 'on' : ''}" data-cat="${x[0]}"><span class="e">${x[2]}</span>${x[1]}</button>`).join('')
+      : S.cats.map(x => `<button class="cat ${d.cat === x.id ? 'on' : ''}" data-cat="${x.id}"><span class="e">${x.emoji}</span>${esc(x.name)}</button>`).join('') + `<button class="cat new" data-act="catnew-add"><span class="e">＋</span>New</button>`}</div>
     ${catBudgetHint}
-    <input id="note" placeholder="Note (what was it?)" value="${esc(d.note)}" maxlength="80" autocomplete="off" style="margin:8px 0 10px">
+    <input id="note" placeholder="${isIn ? 'Note (e.g. salary, Amazon refund)' : 'Note (what was it?)'}" value="${esc(d.note)}" maxlength="80" autocomplete="off" style="margin:8px 0 10px">
     ${d.more ? `<div class="modes">${['UPI', 'Card', 'Cash'].map(m => `<button data-mode="${m}" class="${d.mode === m ? 'on' : ''}">${m}</button>`).join('')}<input id="when" type="datetime-local" value="${local}" style="flex:1.6;padding:6px 8px;font-size:13px"></div>`
-      : `<div class="whenchip"><button class="chip" data-act="addmore">${relDay(d.ts)} ${timeStr(d.ts)} · ${esc(d.mode)} ▾</button></div>`}
+      : `<div class="whenchip" style="gap:8px;flex-wrap:wrap"><button class="chip" data-act="addmore">${relDay(d.ts)} ${timeStr(d.ts)}${isIn ? '' : ' · ' + esc(d.mode)} ▾</button>${isIn ? '' : `<button class="chip" data-act="splitcycle">${d.split > 1 ? `Split ${d.split} ways · yours ${money(share)}` : 'Split bill'}</button>`}${isIn || d.photo ? '' : `<button class="chip" data-act="attach">📎 Receipt</button>`}</div>`}
+    ${d.photo ? `<img id="rimg" class="rimg" data-act="viewphoto" alt="Receipt">` : ''}
     <div class="pad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map(k => `<button data-key="${k}">${k}</button>`).join('')}</div>
-    <div class="actions">${d.editing ? `<button class="btn danger" data-act="deltx">Delete</button>` : `<button class="btn" data-act="skip" title="You were going to buy it, and didn't">Skipped it <span class="gs">💪</span></button>`}
+    <div class="actions">${d.editing ? `<button class="btn danger" data-act="deltx">Delete</button>` : isIn ? `<button class="btn" data-act="close">Cancel</button>` : `<button class="btn" data-act="skip" title="You were going to buy it, and didn't">Skipped it <span class="gs">💪</span></button>`}
       <button class="btn primary" data-act="savetx">${d.editing ? 'Update' : 'Save'}</button></div>
-    ${d.editing ? '' : '<div class="small muted" style="text-align:center;margin-top:10px">Were going to buy it and didn\'t? Tap <b>Skipped it</b> to bank the money.</div>'}`);
+    ${d.editing || isIn ? '' : '<div class="small muted" style="text-align:center;margin-top:10px">Were going to buy it and didn\'t? Tap <b>Skipped it</b> to bank the money.</div>'}`);
+  if (d.photo) loadRimg();
   // do not steal focus on phones; the numpad is the input
 }
 function syncDraftInputs() {
@@ -814,9 +901,27 @@ function padKey(k) {
 }
 function saveTx() {
   syncDraftInputs();
-  const amt = Math.round((parseFloat(draft.amtStr) || 0) * 100) / 100;
-  if (!amt) { toast('Type an amount first'); return; }
+  const full = Math.round((parseFloat(draft.amtStr) || 0) * 100) / 100;
+  if (!full) { toast('Type an amount first'); return; }
+  if (draft.dir === 'in') {
+    const inc = { id: draft.id, amt: full, kind: draft.cat || 'other', note: draft.note.trim(), ts: draft.ts };
+    if (!Array.isArray(S.inc)) S.inc = [];
+    const k = S.inc.findIndex(x => x.id === inc.id); if (k >= 0) S.inc[k] = inc; else S.inc.push(inc);
+    save(); const was = draft.editing; closeSheet(); render(); tick(15);
+    if (was) toast('Updated'); else toast(`Logged +${money(full)} received`, 2600, { label: 'Undo', fn: () => { S.inc = S.inc.filter(x => x.id !== inc.id); save(); render(); toast('Removed'); } });
+    return;
+  }
+  const split = !draft.editing && draft.split > 1 ? draft.split : 1;
+  const amt = split > 1 ? Math.round(full / split * 100) / 100 : full;
   const tx = { id: draft.id, amt, cat: draft.cat || 'other', note: draft.note.trim(), mode: draft.mode, ts: draft.ts, src: draft.src };
+  if (draft.photo) tx.photo = true;
+  let iou = null;
+  if (split > 1) {
+    tx.note = (tx.note || catById(tx.cat).name) + ` (split ${split})`;
+    iou = { id: uid(), who: 'Friends', amt: Math.round((full - amt) * 100) / 100, dir: 'owed', note: tx.note, ts: draft.ts, settled: false };
+    if (!Array.isArray(S.ious)) S.ious = [];
+    S.ious.push(iou);
+  }
   const i = S.tx.findIndex(t => t.id === tx.id);
   const before = calc();
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
@@ -824,9 +929,10 @@ function saveTx() {
   const wasEdit = draft.editing; closeSheet(); render();
   if (navigator.vibrate) navigator.vibrate(15);
   const c = calc();
-  const undo = { label: 'Undo', fn: () => { S.tx = S.tx.filter(x => x.id !== tx.id); save(); render(); toast('Removed'); } };
+  const undo = { label: 'Undo', fn: () => { S.tx = S.tx.filter(x => x.id !== tx.id); if (iou) S.ious = S.ious.filter(x => x.id !== iou.id); save(); render(); toast('Removed'); } };
   const cross = budgetCrossing(tx.cat, before, c);
   if (wasEdit) toast('Updated');
+  else if (iou) toast(`Logged your ${money(amt)} share · ${money(iou.amt)} owed to you`, 5000, undo);
   else if (cross) toast(cross, 5000, undo);
   else if (c.income) toast(c.leftToday >= 0 ? `Logged ${money(amt)} · ${money(c.leftToday, { dec: false })} left today` : `Logged ${money(amt)} · over today by ${money(-c.leftToday, { dec: false })}`, 2600, undo);
   else toast(`Logged ${money(amt)} under ${catById(tx.cat).name}`, 2600, undo);
@@ -885,6 +991,137 @@ function catForm(ct, back) {
     <div class="actions">${isNew || ct.id === 'other' ? `<button class="btn" data-act="close">Cancel</button>` : `<button class="btn danger" data-act="catdel" data-id="${ct.id}">Delete</button>`}<button class="btn primary" data-act="catsave" data-id="${ct.id}">Save</button></div>`);
 }
 
+function iouForm(o) {
+  const isNew = !o; o = o || { id: uid(), who: '', amt: '', note: '', dir: 'owed' };
+  openSheet(`<h3 style="margin:4px 0 14px">${isNew ? 'Who owes what' : 'Edit'}</h3>
+    <div class="field"><label>Who</label><input id="i-who" value="${esc(o.who)}" placeholder="e.g. Rohan"></div>
+    <div class="two"><div class="field"><label>Amount</label><input id="i-amt" type="number" inputmode="decimal" value="${o.amt}"></div>
+    <div class="field"><label>Direction</label><select id="i-dir"><option value="owed" ${o.dir !== 'owe' ? 'selected' : ''}>They owe me</option><option value="owe" ${o.dir === 'owe' ? 'selected' : ''}>I owe them</option></select></div></div>
+    <div class="field"><label>For</label><input id="i-note" value="${esc(o.note)}" placeholder="e.g. dinner, tickets"></div>
+    <div class="actions">${isNew ? `<button class="btn" data-act="close">Cancel</button>` : `<button class="btn danger" data-act="ioudel" data-id="${o.id}">Delete</button>`}<button class="btn primary" data-act="iousave" data-id="${o.id}">Save</button></div>`);
+}
+function cashForm() {
+  openSheet(`<h3 style="margin:4px 0 6px">Cash withdrawal 💵</h3>
+    <p class="small muted" style="margin-top:0">This isn't an expense. It tops up your cash wallet, and every expense you log with <b>Cash</b> comes out of it.</p>
+    <div class="field"><label>Amount</label><input id="k-amt" type="number" inputmode="decimal" placeholder="e.g. 2000"></div>
+    <div class="field"><label>Note (optional)</label><input id="k-note" placeholder="ATM near office"></div>
+    <div class="actions"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="cashsave">Add to wallet</button></div>`);
+}
+
+/* ---------- version, what's new, monthly wrap-up ---------- */
+const VERSION = '1.1.0';
+const CHANGES = [
+  ['📈', 'Graphs', 'History › Insights shows daily bars, pace, categories and your week.'],
+  ['💼', 'Income and refunds', 'Tap Received in the add screen. Home shows money in and your net.'],
+  ['🤝', 'Split bills and IOUs', 'Tap Split bill to log only your share. Goals shows who owes what.'],
+  ['💵', 'Cash wallet', 'Log ATM withdrawals in Setup; Cash expenses come out of it.'],
+  ['📎', 'Receipt photos', 'Attach a photo to any expense.'],
+  ['🔔', 'Reminders and recaps', 'Bill reminders, a Sunday recap and a monthly wrap-up.'],
+  ['🔒', 'App lock and widget', 'Unlock with your phone lock; a home-screen widget shows safe-to-spend.'],
+  ['💾', 'Auto-backup', 'A backup file lands in Downloads/Kharcha every week.']
+];
+function whatsNew() {
+  openSheet(`<h3 style="margin:4px 0 4px">What's new in ${VERSION}</h3><p class="small muted" style="margin-top:0">You're on the newest Kharcha.</p>
+    <div class="list">${CHANGES.map(c => `<div class="item"><div class="emoji">${c[0]}</div><div class="grow"><div class="bold">${c[1]}</div><div class="small muted">${c[2]}</div></div></div>`).join('')}</div>
+    <div class="actions" style="grid-template-columns:1fr"><button class="btn primary" data-act="close">Nice</button></div>`);
+}
+function wrapStats() {
+  const cur = period(), p = period(new Date(+cur.start - DAY));
+  const tx = S.tx.filter(t => inRange(t.ts, p.start, p.end));
+  const spent = sum(tx.map(t => t.amt));
+  const income = +S.settings.income || 0, target = +S.settings.saveTarget || 0, spendable = Math.max(0, income - target);
+  const byCat = {}; tx.forEach(t => byCat[t.cat] = (byCat[t.cat] || 0) + t.amt);
+  const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const byDay = {}; tx.forEach(t => { const k = dayKey(t.ts); byDay[k] = (byDay[k] || 0) + t.amt; });
+  const top = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
+  const busiest = top ? { amt: top[1], ts: tx.find(t => dayKey(t.ts) === top[0]).ts } : null;
+  const saved = sum(S.saves.filter(x => x.kind !== 'skip' && inRange(x.ts, p.start, p.end)).map(x => x.amt));
+  const skipped = sum(S.saves.filter(x => x.kind === 'skip' && inRange(x.ts, p.start, p.end)).map(x => x.amt));
+  const inc = sum((S.inc || []).filter(x => inRange(x.ts, p.start, p.end)).map(x => x.amt));
+  return { p, tx, spent, spendable, cats, busiest, saved, skipped, inc, target };
+}
+function wrapText() {
+  const w = wrapStats(), name = w.p.start.toLocaleDateString('en-IN', { month: 'long' });
+  return `My ${name} on Kharcha: spent ${money(w.spent, { dec: false })}${w.spendable ? ' of ' + money(w.spendable, { dec: false }) : ''}` +
+    (w.cats.length ? '. Top: ' + w.cats.map(([id, v]) => catById(id).name + ' ' + money(v, { dec: false })).join(', ') : '') +
+    (w.skipped ? `. Skipped ${money(w.skipped, { dec: false })} of buys` : '') + (w.saved ? `. Saved first: ${money(w.saved, { dec: false })}` : '') + '.';
+}
+function wrapSheet() {
+  const w = wrapStats(), name = w.p.start.toLocaleDateString('en-IN', { month: 'long' });
+  if (!w.tx.length) { toast('Nothing logged last period yet'); return; }
+  const under = w.spendable ? w.spendable - w.spent : null;
+  const mx = Math.max(...w.cats.map(c => c[1]), 1);
+  openSheet(`<div class="small-caps muted" style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono)">Wrap-up</div>
+    <h3 style="font-size:30px;margin:2px 0 14px">${name}</h3>
+    <div class="card hero" style="margin-bottom:12px"><div class="label">You spent</div><div class="big" style="font-size:52px">${money(w.spent, { dec: false })}</div>
+      <div class="line">${under === null ? `${w.tx.length} expenses` : under >= 0 ? `${money(under, { dec: false })} under your limit of ${money(w.spendable, { dec: false })} 🎯` : `${money(-under, { dec: false })} over your limit of ${money(w.spendable, { dec: false })}`}</div></div>
+    ${w.cats.length ? `<div class="card list">${w.cats.map(([id, v]) => `<div class="item"><div class="emoji">${catById(id).emoji}</div><div class="grow"><div class="row"><span class="grow bold">${esc(catById(id).name)}</span><span class="num bold">${money(v, { dec: false })}</span></div><div class="bar thin"><i style="width:${v / mx * 100}%"></i></div></div></div>`).join('')}</div>` : ''}
+    <div class="stats"><div class="card stat"><div class="k">Skipped buys</div><div class="v">${money(w.skipped, { dec: false })}</div></div><div class="card stat"><div class="k">${w.inc ? 'Money in' : 'Saved first'}</div><div class="v">${money(w.inc || w.saved, { dec: false })}</div></div></div>
+    ${w.busiest ? `<div class="small muted" style="margin:2px 4px 12px">Biggest day: ${new Date(w.busiest.ts).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}, ${money(w.busiest.amt, { dec: false })}.</div>` : ''}
+    <div class="actions"><button class="btn" data-act="wrapshare">Copy summary</button><button class="btn primary" data-act="close">Done</button></div>`);
+}
+function startupSheets() {
+  if (!S.settings.onboarded) return;
+  const key = monthKey(period().start); let shown = false;
+  if (S.settings.wrapSeen !== key) {
+    const first = S.settings.wrapSeen === undefined; S.settings.wrapSeen = key; save();
+    if (!first && wrapStats().tx.length >= 3) { setTimeout(() => { if (!$('#sheet').classList.contains('show')) wrapSheet(); }, 900); shown = true; }
+  }
+  if (!shown && S.settings.seenVersion !== VERSION) {
+    S.settings.seenVersion = VERSION; save();
+    if (Date.now() - (S.created || 0) > DAY) setTimeout(() => { if (!$('#sheet').classList.contains('show')) whatsNew(); }, 1400);
+  }
+}
+
+/* ---------- phone-side extras: widget, reminders, lock, auto-backup ---------- */
+let appInfo = '', pushT = null;
+function recapPayload() {
+  const now = Date.now(), c = calc(), pp = period(new Date(+c.p.start - DAY));
+  const wk = S.tx.filter(t => t.ts >= now - 7 * DAY), pw = S.tx.filter(t => t.ts >= now - 14 * DAY && t.ts < now - 7 * DAY);
+  const byCat = {}; wk.forEach(t => byCat[t.cat] = (byCat[t.cat] || 0) + t.amt);
+  const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+  return { currency: S.settings.currency, weekSpent: Math.round(sum(wk.map(t => t.amt))), prevWeekSpent: Math.round(sum(pw.map(t => t.amt))),
+    topCategory: top ? catById(top[0]).name : '', monthSpent: Math.round(c.spent),
+    prevMonthSpent: Math.round(sum(S.tx.filter(t => inRange(t.ts, pp.start, pp.end)).map(t => t.amt))),
+    savedThisMonth: Math.round(c.savedP), skippedThisMonth: Math.round(c.skippedP), asOf: now };
+}
+function pushNative() {
+  try { if (!KN) return; } catch (e) { return; }
+  clearTimeout(pushT);
+  pushT = setTimeout(() => {
+    try {
+      const c = calc(), neg = c.leftToday < 0;
+      const w = c.income ? { amount: money(Math.abs(c.leftToday), { dec: false }), label: neg ? 'Over today by' : 'Safe to spend today', line: c.spentToday ? `Spent ${money(c.spentToday, { dec: false })} today` : 'Nothing spent yet today' }
+        : { amount: money(c.spent, { dec: false }), label: 'Spent this month', line: `${c.txP.length} expense${c.txP.length === 1 ? '' : 's'}` };
+      if (KN.setWidget) KN.setWidget(w).catch(() => {});
+      if (KN.setSchedule) KN.setSchedule({
+        bills: (S.subs || []).filter(x => x.remind !== false).map(x => ({ id: x.id, name: x.name, amt: x.amt, day: x.day })),
+        recap: recapPayload(),
+        enabled: { bills: S.settings.notifBills !== false, weekly: S.settings.notifWeekly !== false, monthly: S.settings.notifMonthly !== false }
+      }).catch(() => {});
+    } catch (e) {}
+  }, 700);
+}
+function autoBackup() {
+  if (!KN || !KN.saveText || S.settings.autoBackup === false || S.tx.length < 5) return;
+  if (Date.now() - (S.settings.lastAuto || 0) < 7 * DAY) return;
+  const name = 'kharcha-auto-' + new Date().toLocaleDateString('en-CA') + '.json';
+  KN.saveText({ name, text: JSON.stringify(S), mime: 'application/json' })
+    .then(() => { S.settings.lastAuto = Date.now(); save(); toast('Weekly backup saved to Downloads/Kharcha', 3500); }).catch(() => {});
+}
+async function toggleSetting(key) {
+  if (key === 'lock') {
+    const on = !S.settings.lock;
+    if (on) {
+      try { const r = await KN.lockAvailable(); if (!r.available) { toast('Set a screen lock (PIN, pattern or fingerprint) on your phone first', 4500); return; } }
+      catch (e) { toast('App lock needs the updated Android app'); return; }
+    }
+    S.settings.lock = on; save(); try { KN.setLock({ on }); } catch (e) {} render(); return;
+  }
+  S.settings[key] = S.settings[key] === false; save(); pushNative(); render();
+}
+const togRow = (key, label, desc, on) => `<div class="tog"><div class="grow"><div class="bold">${label}</div><div class="small muted">${desc}</div></div><button class="chip ${on ? 'sel' : ''}" data-tog="${key}">${on ? 'On' : 'Off'}</button></div>`;
+
 /* ---------- import / export ---------- */
 function download(name, text, type) {
   if (typeof KN !== 'undefined' && KN && KN.saveText) {   // the Android app: WebViews cannot download blobs
@@ -895,8 +1132,9 @@ function download(name, text, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 function exportCsv() {
-  const rows = [['Date', 'Time', 'Amount', 'Category', 'Note', 'Mode']];
-  [...S.tx].sort((a, b) => a.ts - b.ts).forEach(t => { const d = new Date(t.ts); rows.push([d.toLocaleDateString('en-CA'), d.toTimeString().slice(0, 5), t.amt, catById(t.cat).name, t.note, t.mode]); });
+  const rows = [['Date', 'Time', 'Amount', 'Category', 'Note', 'Mode', 'Type']];
+  [...S.tx].sort((a, b) => a.ts - b.ts).forEach(t => { const d = new Date(t.ts); rows.push([d.toLocaleDateString('en-CA'), d.toTimeString().slice(0, 5), t.amt, catById(t.cat).name, t.note, t.mode, 'Expense']); });
+  (S.inc || []).forEach(t => { const d = new Date(t.ts); rows.push([d.toLocaleDateString('en-CA'), d.toTimeString().slice(0, 5), t.amt, incKind(t.kind)[1], t.note, '', 'Income']); });
   download('kharcha-' + new Date().toLocaleDateString('en-CA') + '.csv', rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(',')).join('\n'), 'text/csv');
 }
 function importJson() {
@@ -954,6 +1192,8 @@ async function nativeSync() {
     syncCats();
     nat = await KN.status();
     if (nat.notifications) KN.showQuickAdd().catch(() => {});
+    if (KN.appInfo) KN.appInfo().then(r => { appInfo = ' · build ' + r.versionName + (r.versionCode ? ' (' + r.versionCode + ')' : ''); }).catch(() => {});
+    autoBackup();
     if ((tab === 'settings' || tab === 'home') && !draft) render();
   } catch (e) {}
 }
@@ -975,9 +1215,11 @@ document.addEventListener('click', e => {
     if (draft.cat && parseFloat(draft.amtStr)) { const b = $('[data-act="savetx"]'); if (b) b.classList.add('pulse'); }
     return;
   }
+  if (t.dataset.dir && draft) { syncDraftInputs(); if (draft.dir !== t.dataset.dir) { draft.dir = t.dataset.dir; draft.cat = ''; draft.split = 1; } renderAdd(); return; }
   if (t.dataset.mode && draft) { syncDraftInputs(); draft.mode = t.dataset.mode; renderAdd(); return; }
   if (t.dataset.hview) { histView = t.dataset.hview; render(true); return; }
   if (t.dataset.hcat !== undefined) { histCat = t.dataset.hcat; render(); return; }
+  if (t.dataset.tog) { toggleSetting(t.dataset.tog); return; }
   if (t.dataset.hist) { histFilter = t.dataset.hist; render(); return; }
   if (t.dataset.themeBtn) { S.settings.theme = t.dataset.themeBtn; save(); render(); return; }
   if (t.dataset.pct) { onbRead(); onb.save = String(Math.round((+onb.income || 0) * t.dataset.pct / 100)); renderOnboarding(); return; }
@@ -1001,6 +1243,8 @@ document.addEventListener('click', e => {
     case 'savetx': saveTx(); break;
     case 'skip': skipTx(); break;
     case 'deltx': {
+      const inc = (S.inc || []).find(x => x.id === draft.id);
+      if (inc) { S.inc = S.inc.filter(x => x.id !== inc.id); save(); closeSheet(); render(); toast('Deleted', 5000, { label: 'Undo', fn: () => { S.inc.push(inc); save(); render(); } }); break; }
       const gone = S.tx.find(x => x.id === draft.id); if (!gone) break;
       S.tx = S.tx.filter(x => x.id !== gone.id); save(); closeSheet(); render(); tick(20);
       toast('Deleted ' + money(gone.amt), 5000, { label: 'Undo', fn: () => { if (!S.tx.some(x => x.id === gone.id)) { S.tx.push(gone); save(); render(); toast('Restored'); } } });
@@ -1008,6 +1252,25 @@ document.addEventListener('click', e => {
     }
     case 'addmore': syncDraftInputs(); draft.more = true; renderAdd(); break;
     case 'gotoins': histView = 'insights'; go('history'); break;
+    case 'splitcycle': syncDraftInputs(); draft.split = draft.split >= 6 ? 1 : (draft.split || 1) + 1; renderAdd(); break;
+    case 'attach': syncDraftInputs(); attachPhoto(); break;
+    case 'viewphoto': showPhoto(draft.id, () => { draft.photo = false; renderAdd(); }); break;
+    case 'iounew': iouForm(); break;
+    case 'iouedit': iouForm(S.ious.find(x => x.id === id)); break;
+    case 'iousave': {
+      const who = $('#i-who').value.trim(), amt = +$('#i-amt').value; if (!who || !amt) { toast('Who, and how much?'); break; }
+      let o = S.ious.find(x => x.id === id); if (!o) { o = { id, ts: Date.now(), settled: false }; S.ious.push(o); }
+      Object.assign(o, { who, amt, note: $('#i-note').value.trim(), dir: $('#i-dir').value }); save(); closeSheet(); render(); break;
+    }
+    case 'ioudel': S.ious = S.ious.filter(x => x.id !== id); save(); closeSheet(); render(); break;
+    case 'iousettle': { const o = S.ious.find(x => x.id === id); if (o) { o.settled = true; save(); render(); toast(o.dir === 'owe' ? 'Marked as paid' : 'Marked as received', 4000, { label: 'Undo', fn: () => { o.settled = false; save(); render(); } }); } break; }
+    case 'ioucopy': { const o = S.ious.find(x => x.id === id); if (o) { const msg = `Hey ${o.who === 'Friends' ? '' : o.who + ', '}${money(o.amt)} for ${o.note || 'that'}. Send it when you can 🙏`; (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(() => toast('Reminder copied. Paste it in a chat'), () => toast(msg, 6000)); } break; }
+    case 'cashnew': cashForm(); break;
+    case 'cashsave': { const amt = +$('#k-amt').value; if (!amt) { toast('How much did you withdraw?'); break; } S.cash.push({ id: uid(), amt, ts: Date.now(), note: $('#k-note').value.trim() }); save(); closeSheet(); render(); toast('Cash wallet: ' + money(cashBalance(), { dec: false })); break; }
+    case 'cashdel': S.cash = S.cash.filter(x => x.id !== id); save(); render(); break;
+    case 'wrap': wrapSheet(); break;
+    case 'whatsnew': whatsNew(); break;
+    case 'wrapshare': { const t = wrapText(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied. Paste it anywhere'), () => toast('Could not copy')); break; }
     case 'toastact': { const f = toast._fn; toast._fn = null; $('#toast').classList.remove('show'); if (f) f(); break; }
     case 'close': if (catForm.back) { const d = catForm.back; catForm.back = null; draft = d; renderAdd(); } else closeSheet(); break;
     case 'newgoal': goalForm(); break;
@@ -1098,6 +1361,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && !d
 runSubs();
 render();
 handleIncoming();
+startupSheets();
 // Android app: kharcha://add?text=... from MacroDroid
 if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {
   let lastUrl = '';
