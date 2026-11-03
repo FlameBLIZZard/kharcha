@@ -1172,6 +1172,29 @@ function recapPayload() {
     prevMonthSpent: Math.round(sum(S.tx.filter(t => inRange(t.ts, pp.start, pp.end)).map(t => t.amt))),
     savedThisMonth: Math.round(c.savedP), skippedThisMonth: Math.round(c.skippedP), asOf: now, startDay: Math.min(28, Math.max(1, S.settings.startDay | 0 || 1)) };
 }
+function widgetStats(c) {
+  const t0 = +startOfDay(Date.now()), week = [];
+  for (let i = 6; i >= 0; i--) {
+    const d0 = t0 - i * DAY, v = sum(S.tx.filter(t => t.ts >= d0 && t.ts < d0 + DAY).map(t => t.amt));
+    week.push({ d: new Date(d0).toLocaleDateString('en-IN', { weekday: 'narrow' }), v: Math.round(v) });
+  }
+  const gs = (S.goals || []).map(g => ({ g, saved: goalSaved(g) })).filter(x => +x.g.target > 0);
+  const pick = gs.find(x => x.saved < x.g.target) || gs[0];
+  const bill = upcomingSubs(31)[0];
+  const byCat = {}; c.txP.forEach(t => byCat[t.cat] = (byCat[t.cat] || 0) + t.amt);
+  const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+  const left = c.income ? c.spendable - c.spent : null;
+  return {
+    currency: S.settings.currency, todaySpent: Math.round(c.spentToday), monthSpent: Math.round(c.spent),
+    spendable: Math.round(c.spendable), budgetLeft: left === null ? null : Math.round(left),
+    pctUsed: c.spendable ? Math.min(999, Math.round(c.spent / c.spendable * 100)) : null, daysLeft: c.daysLeft,
+    safeToday: c.income ? Math.round(c.leftToday) : null, week, weekTotal: Math.round(sum(week.map(x => x.v))),
+    goal: pick ? { name: pick.g.name, emoji: pick.g.emoji || '🎯', saved: Math.round(pick.saved), target: Math.round(pick.g.target), pct: Math.min(100, Math.round(pick.saved / pick.g.target * 100)) } : null,
+    bill: bill ? { name: bill.name, amt: Math.round(+bill.amt || 0), left: bill.left } : null,
+    top: top ? { name: catById(top[0]).name, emoji: catById(top[0]).emoji, amt: Math.round(top[1]) } : null,
+    streak: streak().n
+  };
+}
 function pushNative() {
   try { if (!KN) return; } catch (e) { return; }
   clearTimeout(pushT);
@@ -1180,6 +1203,7 @@ function pushNative() {
       const c = calc(), neg = c.leftToday < 0;
       const w = c.income ? { amount: money(Math.abs(c.leftToday), { dec: false }), label: neg ? 'Over today by' : 'Safe to spend today', line: c.spentToday ? `Spent ${money(c.spentToday, { dec: false })} today` : 'Nothing spent yet today' }
         : { amount: money(c.spent, { dec: false }), label: 'Spent this month', line: `${c.txP.length} expense${c.txP.length === 1 ? '' : 's'}` };
+      w.stats = widgetStats(c);
       if (KN.setWidget) KN.setWidget(w).catch(() => {});
       if (KN.setSchedule) KN.setSchedule({
         bills: (S.subs || []).filter(x => x.remind !== false).map(x => ({ id: x.id, name: x.name, amt: x.amt, day: x.day })),
