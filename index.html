@@ -440,13 +440,19 @@ function subForm(sub) {
     <div class="actions">${isNew ? `<button class="btn" data-act="close">Cancel</button>` : `<button class="btn danger" data-act="subdel" data-id="${sub.id}">Delete</button>`}<button class="btn primary" data-act="subsave" data-id="${sub.id}">Save</button></div>`);
 }
 
+// Salary you log replaces your expected monthly income (never doubles it); refunds, cashback and other money in add on top.
+function effIncome(p) {
+  const base = +S.settings.income || 0; if (!base) return 0;
+  const m = (S.inc || []).filter(x => inRange(x.ts, p.start, p.end));
+  return Math.max(base, sum(m.filter(x => x.kind === 'salary').map(x => x.amt))) + sum(m.filter(x => x.kind !== 'salary').map(x => x.amt));
+}
 function calc() {
   const p = period(), now = Date.now(), today = +startOfDay(now);
   const txP = S.tx.filter(t => inRange(t.ts, p.start, p.end));
   const spent = sum(txP.map(t => t.amt));
   const spentToday = sum(txP.filter(t => t.ts >= today).map(t => t.amt));
   const spentBefore = spent - spentToday;
-  const income = +S.settings.income || 0, target = +S.settings.saveTarget || 0;
+  const income = effIncome(p), target = +S.settings.saveTarget || 0;
   const spendable = Math.max(0, income - target);
   const daysLeft = Math.max(1, Math.ceil((p.end - today) / DAY));
   const allowToday = income ? (spendable - spentBefore) / daysLeft : 0;
@@ -468,7 +474,7 @@ function streak() {
   let n = 0, d = startOfDay(Date.now());
   const todayOk = () => {
     if (!income) return logged.has(dayKey(d));
-    const daily = Math.max(0, income - target) / period(d).days;
+    const pd = period(d), daily = Math.max(0, effIncome(pd) - target) / pd.days;
     return (byDay[dayKey(d)] || 0) <= daily;
   };
   const okToday = todayOk();
@@ -572,7 +578,7 @@ function viewHome() {
 
   // money in, owed, cash
   const pin = (S.inc || []).filter(x => inRange(x.ts, c.p.start, c.p.end)), inSum = sum(pin.map(x => x.amt));
-  if (inSum) h += `<div class="card"><div class="row"><div class="grow"><div class="small muted">Money in this month</div><div class="bold">+${money(inSum, { dec: false })}</div></div><div style="text-align:right"><div class="small muted">Net after spending</div><div class="bold">${inSum - c.spent < 0 ? '−' : ''}${money(Math.abs(inSum - c.spent), { dec: false })}</div></div></div></div>`;
+  if (inSum) h += `<div class="card"><div class="row"><div class="grow"><div class="small muted">Money in this month</div><div class="bold">+${money(inSum, { dec: false })}</div><div class="small muted">${c.income ? 'Added to your budget' : 'Set your income to count it'}</div></div><div style="text-align:right"><div class="small muted">${c.income ? 'Left this month' : 'Net after spending'}</div><div class="bold">${(c.income ? c.spendable - c.spent : inSum - c.spent) < 0 ? '−' : ''}${money(Math.abs(c.income ? c.spendable - c.spent : inSum - c.spent), { dec: false })}</div></div></div></div>`;
   const ow = owedToMe(), io = iOwe();
   if (ow || io) h += `<button class="card" style="display:block;width:100%;text-align:left" data-tab="goals"><div class="row"><div class="emoji">🤝</div><div class="grow"><div class="bold">${ow ? money(ow, { dec: false }) + ' owed to you' : money(io, { dec: false }) + ' you owe'}</div><div class="small muted">${ow && io ? money(io, { dec: false }) + ' you owe · ' : ''}Tap to see who</div></div></div></button>`;
   if ((S.cash || []).length) h += `<button class="card" style="display:block;width:100%;text-align:left" data-tab="settings"><div class="row"><div class="emoji">💵</div><div class="grow"><div class="bold">${money(Math.max(0, cashBalance()), { dec: false })} cash in hand</div><div class="small muted">From your logged ATM withdrawals</div></div></div></button>`;
@@ -996,7 +1002,7 @@ function saveTx() {
     if (!Array.isArray(S.inc)) S.inc = [];
     const k = S.inc.findIndex(x => x.id === inc.id); if (k >= 0) S.inc[k] = inc; else S.inc.push(inc);
     save(); const was = draft.editing; closeSheet(); render(); tick(15);
-    if (was) toast('Updated'); else toast(`Logged +${money(full)} received`, 2600, { label: 'Undo', fn: () => { S.inc = S.inc.filter(x => x.id !== inc.id); save(); render(); toast('Removed'); } });
+    if (was) toast('Updated'); else toast(`Logged +${money(full)} received${calc().income ? ' · ' + money(calc().spendable - calc().spent, { dec: false }) + ' left this month' : ''}`, 2600, { label: 'Undo', fn: () => { S.inc = S.inc.filter(x => x.id !== inc.id); save(); render(); toast('Removed'); } });
     return;
   }
   const split = !draft.editing && draft.split > 1 ? draft.split : 1;
@@ -1117,7 +1123,7 @@ function wrapStats() {
   const cur = period(), p = period(new Date(+cur.start - DAY));
   const tx = S.tx.filter(t => inRange(t.ts, p.start, p.end));
   const spent = sum(tx.map(t => t.amt));
-  const income = +S.settings.income || 0, target = +S.settings.saveTarget || 0, spendable = Math.max(0, income - target);
+  const income = effIncome(p), target = +S.settings.saveTarget || 0, spendable = Math.max(0, income - target);
   const byCat = {}; tx.forEach(t => byCat[t.cat] = (byCat[t.cat] || 0) + t.amt);
   const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const byDay = {}; tx.forEach(t => { const k = dayKey(t.ts); byDay[k] = (byDay[k] || 0) + t.amt; });
