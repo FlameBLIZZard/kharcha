@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pulse: streak on the left, top category this month on the right. Default text is the picker preview. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/kharcha_widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="10dp">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/w_streak"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-black"
+            android:text="12"
+            android:textColor="#FFFFFF"
+            android:textSize="30sp" />
+
+        <TextView
+            android:id="@+id/w_streak_l"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="DAY STREAK"
+            android:textColor="#8A8A8A"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:contentDescription="@null"
+        android:layout_width="1dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:background="#262626" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:text="TOP THIS MONTH"
+            android:textColor="#8A8A8A"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/w_top"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-black"
+            android:singleLine="true"
+            android:text="Food"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/w_top_amt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="₹4,200"
+            android:textColor="#BDBDBD"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

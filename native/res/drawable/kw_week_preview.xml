@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker preview only: seven grey bars, the last one white. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="280dp" android:height="90dp" android:viewportWidth="280" android:viewportHeight="90">
+    <path android:fillColor="#5A5A5A" android:pathData="M6,50h28v40h-28z" />
+    <path android:fillColor="#5A5A5A" android:pathData="M46,30h28v60h-28z" />
+    <path android:fillColor="#5A5A5A" android:pathData="M86,62h28v28h-28z" />
+    <path android:fillColor="#5A5A5A" android:pathData="M126,20h28v70h-28z" />
+    <path android:fillColor="#5A5A5A" android:pathData="M166,44h28v46h-28z" />
+    <path android:fillColor="#5A5A5A" android:pathData="M206,8h28v82h-28z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M246,38h28v52h-28z" />
+</vector>

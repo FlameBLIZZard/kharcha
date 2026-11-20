@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick add 4x1: "+ Add expense" and "Skipped it". -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/kharcha_widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/w_add"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.4"
+        android:background="@drawable/kharcha_widget_btn"
+        android:fontFamily="sans-serif-black"
+        android:gravity="center"
+        android:minHeight="40dp"
+        android:singleLine="true"
+        android:text="+  Add expense"
+        android:textColor="#000000"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/w_skip"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:background="@drawable/kw_btn_dark"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:minHeight="40dp"
+        android:singleLine="true"
+        android:text="Skipped it"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp" />
+</LinearLayout>
