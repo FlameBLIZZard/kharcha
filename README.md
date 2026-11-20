@@ -46,6 +46,7 @@ No build step. Serve the folder and open it:
 ```
 npm start        # python -m http.server 8080
 npm test         # SMS parser tests
+npm run test:ui  # tap through the whole app in a headless phone browser (needs Playwright and npm start running)
 ```
 
 - `index.html` holds the UI, styles and app logic.
