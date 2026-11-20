@@ -14,6 +14,7 @@ final class Store {
             JSONArray a = new JSONArray(sp(c).getString("pending", "[]"));
             a.put(item);
             sp(c).edit().putString("pending", a.toString()).apply();
+            KharchaWidget.logged(c, item.optDouble("amt", 0));
         } catch (Exception ignored) { }
     }
 

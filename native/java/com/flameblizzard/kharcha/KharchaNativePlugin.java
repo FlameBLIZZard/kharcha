@@ -111,6 +111,53 @@ public class KharchaNativePlugin extends Plugin {
         }
     }
 
+    /** Home-screen widget numbers: { amount: "₹683", label: "Safe to spend today", line: "Spent ₹420 of ₹1,103" }. */
+    @PluginMethod
+    public void setWidget(PluginCall call) {
+        com.getcapacitor.JSObject st = call.getObject("stats");
+        KharchaWidget.set(getContext(), call.getString("amount", ""), call.getString("label", ""), call.getString("line", ""), st == null ? null : st.toString());
+        call.resolve();
+    }
+
+    /** True if the phone has a screen lock (PIN, pattern, fingerprint or face), which the app lock needs. */
+    @PluginMethod
+    public void lockAvailable(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("available", MainActivity.lockAvailable(getContext()));
+        call.resolve(o);
+    }
+
+    @PluginMethod
+    public void setLock(PluginCall call) {
+        getContext().getSharedPreferences("kharcha_native", Context.MODE_PRIVATE).edit().putBoolean("lock", Boolean.TRUE.equals(call.getBoolean("on", false))).apply();
+        call.resolve();
+    }
+
+    /** Bills, recap numbers and on/off switches for the reminder and recap notifications. */
+    @PluginMethod
+    public void setSchedule(PluginCall call) {
+        Scheduler.save(getContext(), call.getData().toString());
+        call.resolve();
+    }
+
+    /** Posts the bill reminders and both recaps right now, ignoring the day rules (for a "preview" button). */
+    @PluginMethod
+    public void previewSchedule(PluginCall call) {
+        Scheduler.tick(getContext(), "all", true);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void appInfo(PluginCall call) {
+        JSObject o = new JSObject();
+        try {
+            android.content.pm.PackageInfo pi = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            o.put("versionName", pi.versionName);
+            o.put("versionCode", Build.VERSION.SDK_INT >= 28 ? pi.getLongVersionCode() : pi.versionCode);
+        } catch (Exception e) { o.put("versionName", "?"); o.put("versionCode", 0); }
+        call.resolve(o);
+    }
+
     private void start(Intent i) {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try { getContext().startActivity(i); } catch (Exception ignored) { }

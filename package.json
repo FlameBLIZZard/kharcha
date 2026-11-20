@@ -1,12 +1,13 @@
 {
   "name": "kharcha",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Log an expense in two taps, and save before you spend. Installable offline web app, with an Android APK build.",
   "scripts": {
     "test": "node tests/parse.test.mjs",
     "start": "python -m http.server 8080",
-    "build:www": "node scripts/build-www.mjs"
+    "build:www": "node scripts/build-www.mjs",
+    "test:ui": "node tests/ui-smoke.cjs && node tests/ui-smoke.cjs native"
   },
   "dependencies": {
     "@capacitor/android": "6.2.0",

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Budget left and Goal: label, big number, progress bar, small line. Default text is the picker preview. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/kharcha_widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/w_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:singleLine="true"
+        android:text="Budget left"
+        android:textAllCaps="true"
+        android:textColor="#8A8A8A"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/w_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-black"
+        android:singleLine="true"
+        android:text="₹18,450"
+        android:textColor="#FFFFFF"
+        android:textSize="32sp" />
+
+    <ProgressBar
+        android:id="@+id/w_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="10dp"
+        android:max="100"
+        android:progress="62"
+        android:progressDrawable="@drawable/kw_bar" />
+
+    <TextView
+        android:id="@+id/w_line"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:text="12 days left · 62% used"
+        android:textColor="#BDBDBD"
+        android:textSize="12sp" />
+</LinearLayout>
