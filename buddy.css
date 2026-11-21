@@ -1,0 +1,35 @@
+/* Bill Buddy, in the Ink Arcade look (uses the tokens from ink.css) */
+.av { flex: none; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--av, var(--pop)); color: #16141a; border: 2.5px solid var(--k); box-shadow: 2px 2px 0 var(--k); font-family: var(--display); font-size: 17px; line-height: 1; }
+.av.sm { width: 24px; height: 24px; font-size: 11px; border-width: 2px; box-shadow: none; }
+.av.lg { width: 56px; height: 56px; font-size: 24px; box-shadow: 3px 3px 0 var(--k); }
+.av[style*="var(--ink)"] { color: var(--bg); }
+
+.bbhero .big { font-size: clamp(34px, 11vw, 52px); }
+.bbhero .bbsplit { margin-top: 14px; background: var(--pop-ink); color: var(--pop); border-color: var(--pop-ink); box-shadow: 3px 3px 0 color-mix(in srgb, var(--pop-ink) 45%, transparent); }
+
+.pill { flex: none; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; border: 2px solid var(--k); box-shadow: 2px 2px 0 var(--k); }
+.pill.in { background: var(--pop); color: var(--pop-ink); }
+.pill.out { background: var(--warn); color: var(--pop-ink); }
+
+.wrapchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.wrapchips .chip { padding: 6px 12px 6px 6px; }
+.wrapchips .chip:not(.pchip) { padding-left: 12px; }
+.pchip { opacity: .55; }
+.pchip.sel { opacity: 1; }
+.pchip .av { margin-right: 2px; }
+
+.shares { padding: 6px 14px; margin-bottom: 12px; box-shadow: none; }
+.sharerow { display: flex; align-items: center; gap: 10px; min-height: 46px; border-top: 2px dashed var(--panel-2); }
+.sharerow:first-child { border-top: 0; }
+.sharerow input { width: 110px; flex: none; text-align: right; padding: 8px 10px; }
+
+.bbbal { text-align: center; padding: 16px; margin-bottom: 12px; }
+.bbbal.in { background: var(--pop); color: var(--pop-ink); }
+.bbbal.out { background: var(--warn); color: var(--pop-ink); }
+.bbbal.in .muted, .bbbal.out .muted { color: color-mix(in srgb, var(--pop-ink) 70%, transparent); }
+.bignum { font-family: var(--display); font-size: 34px; line-height: 1.1; margin-top: 2px; }
+
+.qrbox { text-align: center; background: var(--panel); border: var(--kb); box-shadow: var(--ks); border-radius: var(--radius); padding: 16px; margin: 6px 0 14px; animation: bbpop .5s var(--spring) both; }
+.qr { width: min(64vw, 240px); height: auto; display: block; margin: 0 auto; border: 2.5px solid #16141a; border-radius: 12px; background: #fff; }
+@keyframes bbpop { from { transform: scale(.85) rotate(-2deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .qrbox { animation: none; } }
