@@ -328,6 +328,7 @@ html.sheet-open nav.tabs .fab { transform: rotate(45deg) scale(.9); }
 <script src="parse.js"></script>
 <script src="qrcode.js"></script>
 <script src="buddy.js"></script>
+<script src="pcsync.js"></script>
 <script>
 'use strict';
 /* ---------- storage ---------- */
@@ -364,7 +365,7 @@ function load() {
   return freshState();
 }
 let S = load();
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Could not save: storage is full or blocked'); } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Could not save: storage is full or blocked'); } pcSyncSoon(); }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 /* ---------- helpers ---------- */
@@ -927,6 +928,7 @@ function viewSettings() {
     <button class="btn block" data-act="smstest">Try it</button>
   </div>
 
+  ${pcCard()}
   <h2>Cash wallet</h2><div class="card"><div class="row"><div class="emoji">💵</div><div class="grow"><div class="bold">${(S.cash || []).length ? money(Math.max(0, cashBalance()), { dec: false }) + ' in hand' : 'Track your cash'}</div>
     <div class="small muted">${(S.cash || []).length ? 'Withdrawals minus expenses you logged as Cash.' : 'Log ATM withdrawals and Kharcha counts down what is left.'}</div></div></div>
     ${[...(S.cash || [])].sort((a, b) => b.ts - a.ts).slice(0, 4).map(x => `<div class="row small" style="margin-top:10px"><span class="grow muted">${relDay(x.ts)}${x.note ? ' · ' + esc(x.note) : ''}</span><span class="bold">+${money(x.amt, { dec: false })}</span><button class="btn ghost small" data-act="cashdel" data-id="${x.id}" aria-label="Remove">✕</button></div>`).join('')}
@@ -1457,7 +1459,7 @@ async function nativeSync() {
 document.addEventListener('click', e => {
   const t = e.target.closest('button, [data-tab]'); if (!t) return;
   if (t.dataset.tab) { go(t.dataset.tab); return; }
-  if (buddyClick(t)) return;
+  if (buddyClick(t) || pcClick(t)) return;
   if (t.dataset.key) { tick(); padKey(t.dataset.key); return; }
   if (t.dataset.cat && draft) {
     tick(10); syncDraftInputs();
@@ -1637,11 +1639,12 @@ document.addEventListener('keydown', e => {
 })();
 window.addEventListener('hashchange', () => { if (location.hash.startsWith('#add')) handleIncoming(); });
 // refresh numbers when the app comes back to the front (day may have changed)
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); runSubs(); render(); nativeSync(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); runSubs(); render(); nativeSync(); pcSyncSoon(600); } });
 
 runSubs();
 render();
 handleIncoming();
+pcSyncSoon(1500);
 startupSheets();
 // Android app: kharcha://add?text=... from MacroDroid
 if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {

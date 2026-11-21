@@ -4,6 +4,9 @@ import shutil, glob, os
 MANIFEST = 'android/app/src/main/AndroidManifest.xml'
 s = open(MANIFEST).read()
 
+# PC sync talks to Beam on the PC over plain http on your own Wi-Fi / Tailscale
+s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
+
 # kharcha://add?... deep link on the main activity
 link = '''
         <intent-filter>
