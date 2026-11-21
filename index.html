@@ -309,6 +309,7 @@ html.sheet-open nav.tabs .fab { transform: rotate(45deg) scale(.9); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 <link rel="stylesheet" href="ink.css">
+<link rel="stylesheet" href="wrapped.css">
 </head>
 <body>
 <div id="app"></div>
@@ -686,6 +687,7 @@ function viewHome() {
 
   const soon = upcomingSubs(7);
   if (soon.length) h += `<h2>Coming up</h2><div class="card list">${soon.map(x => `<button class="item" data-act="subedit" data-id="${x.id}"><div class="emoji">${catById(x.cat).emoji}</div><div class="grow"><div class="bold ellipsis">${esc(x.name)}</div><div class="small muted">${x.left === 0 ? 'Today' : x.left === 1 ? 'Tomorrow' : 'In ' + x.left + ' days'}</div></div><div class="bold num">${money(x.amt)}</div></button>`).join('')}</div>`;
+  if (window.wrappedCard) h += wrappedCard();
   if (IS_APP && KN) {
     const on = [nat.listener, nat.notifications, nat.overlay].filter(Boolean).length;
     if (on < 3) h += `<button class="card savefirst" style="display:block;width:100%;text-align:left" data-tab="settings"><div class="row"><div class="emoji">🔔</div><div class="grow"><div class="bold">Finish auto-detect setup</div><div class="small muted">${on} of 3 switches are on. Tap to turn on the rest so payments pop up on their own.</div></div></div></button>`;
@@ -939,6 +941,7 @@ function viewSettings() {
     <div class="small muted" style="margin-top:6px">Home-screen widget: long-press your home screen, tap <b>Widgets</b>, find <b>Kharcha</b>.</div></div>` : ''}
   <h2>App</h2><div class="card">
     <div class="field"><label>Theme</label><div class="seg" style="margin:0">${['dark', 'light'].map(t => `<button data-theme-btn="${t}" class="${(st.theme || 'dark') === t ? 'on' : ''}">${t === 'dark' ? 'Dark' : 'Light'}</button>`).join('')}</div></div>
+    <button class="btn primary block kw-set" data-act="wrapped" style="margin-bottom:10px">▶ Kharcha Wrapped</button>
     <div class="two"><button class="btn" data-act="wrap">Last month's wrap-up</button><button class="btn" data-act="whatsnew">What's new</button></div>
     <button class="btn block" style="margin-bottom:10px" data-act="replay">Replay the intro</button>
     <div class="two" style="margin-top:10px"><button class="btn" data-act="export">Backup (JSON)</button><button class="btn" data-act="import">Restore</button></div>
@@ -1204,6 +1207,7 @@ function cashForm() {
 /* ---------- version, what's new, monthly wrap-up ---------- */
 const VERSION = '1.2.0';
 const CHANGES = [
+  ['🎬', 'Kharcha Wrapped', 'Your month or year as a loud, animated story. Save it as a reel or images to share. Setup › Kharcha Wrapped.'],
   ['✨', 'Smoother everywhere', 'Buttons, tabs, toggles and charts now move instead of jumping. Drag the add sheet down to close it.'],
   ['🔥', 'Fairer streak', 'Today counts toward your streak the moment you are under the safe-to-spend number.'],
   ['📈', 'Graphs', 'History › Insights shows daily bars, pace, categories and your week.'],
@@ -1253,7 +1257,8 @@ function wrapSheet() {
     ${w.cats.length ? `<div class="card list">${w.cats.map(([id, v]) => `<div class="item"><div class="emoji">${catById(id).emoji}</div><div class="grow"><div class="row"><span class="grow bold">${esc(catById(id).name)}</span><span class="num bold">${money(v, { dec: false })}</span></div><div class="bar thin"><i style="width:${v / mx * 100}%"></i></div></div></div>`).join('')}</div>` : ''}
     <div class="stats"><div class="card stat"><div class="k">Skipped buys</div><div class="v">${money(w.skipped, { dec: false })}</div></div><div class="card stat"><div class="k">${w.inc ? 'Money in' : 'Saved first'}</div><div class="v">${money(w.inc || w.saved, { dec: false })}</div></div></div>
     ${w.busiest ? `<div class="small muted" style="margin:2px 4px 12px">Biggest day: ${new Date(w.busiest.ts).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}, ${money(w.busiest.amt, { dec: false })}.</div>` : ''}
-    <div class="actions"><button class="btn" data-act="wrapshare">Copy summary</button><button class="btn primary" data-act="close">Done</button></div>`);
+    <button class="btn primary block" data-act="wrapped" data-r="last" style="margin-bottom:10px">▶ Play ${name} Wrapped</button>
+    <div class="actions"><button class="btn" data-act="wrapshare">Copy summary</button><button class="btn" data-act="close">Done</button></div>`);
 }
 function startupSheets() {
   if (!S.settings.onboarded) return;
@@ -1648,6 +1653,7 @@ if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {
   };
   Capacitor.Plugins.App.addListener('appUrlOpen', e => openUrl(e.url));
   Capacitor.Plugins.App.addListener('backButton', () => {
+    if (window.kharchaWrapped && kharchaWrapped.isOpen()) return;   // wrapped.js closes its player
     if ($('#sheet').classList.contains('show')) closeSheet();
     else if (tab !== 'home') go('home');
     else if (Capacitor.Plugins.App.exitApp) Capacitor.Plugins.App.exitApp();
@@ -1658,5 +1664,6 @@ if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {
 setTimeout(() => { if (!natLoaded) { natLoaded = true; render(); } }, 2500);   // never leave the screen blank
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
+<script src="wrapped.js"></script>
 </body>
 </html>

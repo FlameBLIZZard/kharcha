@@ -111,6 +111,59 @@ public class KharchaNativePlugin extends Plugin {
         }
     }
 
+    /** Kharcha Wrapped: save a picture or video (base64) to Pictures/Kharcha or Movies/Kharcha. Returns { uri, where }. */
+    @PluginMethod
+    public void saveMedia(PluginCall call) {
+        String name = call.getString("name", "kharcha-wrapped.png");
+        String mime = call.getString("mime", "image/png");
+        String dir = "Movies".equals(call.getString("dir")) ? android.os.Environment.DIRECTORY_MOVIES : android.os.Environment.DIRECTORY_PICTURES;
+        try {
+            byte[] data = android.util.Base64.decode(call.getString("data", ""), android.util.Base64.DEFAULT);
+            if (Build.VERSION.SDK_INT < 29) throw new Exception("needs Android 10 or newer");
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name);
+            v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime);
+            v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, dir + "/Kharcha");
+            v.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
+            android.net.Uri coll = mime.startsWith("video/") ? android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                    : android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+            android.content.ContentResolver cr = getContext().getContentResolver();
+            android.net.Uri uri = cr.insert(coll, v);
+            if (uri == null) throw new Exception("could not create the file");
+            try (java.io.OutputStream os = cr.openOutputStream(uri)) { os.write(data); }
+            v.clear();
+            v.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0);
+            cr.update(uri, v, null, null);
+            JSObject o = new JSObject();
+            o.put("uri", uri.toString());
+            o.put("where", dir + "/Kharcha");
+            call.resolve(o);
+        } catch (Exception e) {
+            call.reject("Could not save: " + e.getMessage());
+        }
+    }
+
+    /** Open the share sheet for files saved with saveMedia. { uris: [...], mime } */
+    @PluginMethod
+    public void shareMedia(PluginCall call) {
+        try {
+            JSArray a = call.getArray("uris");
+            java.util.ArrayList<android.net.Uri> list = new java.util.ArrayList<>();
+            for (int i = 0; i < a.length(); i++) list.add(android.net.Uri.parse(a.getString(i)));
+            Intent s = new Intent(list.size() > 1 ? Intent.ACTION_SEND_MULTIPLE : Intent.ACTION_SEND);
+            s.setType(call.getString("mime", "*/*"));
+            if (list.size() > 1) s.putParcelableArrayListExtra(Intent.EXTRA_STREAM, list);
+            else s.putExtra(Intent.EXTRA_STREAM, list.get(0));
+            s.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent ch = Intent.createChooser(s, "Share your Kharcha Wrapped");
+            ch.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            start(ch);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Could not share: " + e.getMessage());
+        }
+    }
+
     /** Home-screen widget numbers: { amount: "₹683", label: "Safe to spend today", line: "Spent ₹420 of ₹1,103" }. */
     @PluginMethod
     public void setWidget(PluginCall call) {
