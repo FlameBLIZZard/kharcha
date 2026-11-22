@@ -309,6 +309,7 @@ html.sheet-open nav.tabs .fab { transform: rotate(45deg) scale(.9); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 <link rel="stylesheet" href="ink.css">
+<link rel="stylesheet" href="buddy.css">
 <link rel="stylesheet" href="wrapped.css">
 </head>
 <body>
@@ -326,6 +327,9 @@ html.sheet-open nav.tabs .fab { transform: rotate(45deg) scale(.9); }
 <div class="toast" id="toast"></div>
 
 <script src="parse.js"></script>
+<script src="qrcode.js"></script>
+<script src="buddy.js"></script>
+<script src="pcsync.js"></script>
 <script>
 'use strict';
 /* ---------- storage ---------- */
@@ -342,7 +346,7 @@ const DEFAULT_CATS = [
 ];
 function freshState() {
   return { v: 1, created: Date.now(), settings: { name: '', income: 0, saveTarget: 0, startDay: 1, currency: '₹', theme: 'dark', onboarded: false, bestStreak: 0 },
-    cats: DEFAULT_CATS.map(c => ({ ...c })), tx: [], goals: [], saves: [], subs: [], inc: [], ious: [], cash: [] };
+    cats: DEFAULT_CATS.map(c => ({ ...c })), tx: [], goals: [], saves: [], subs: [], inc: [], ious: [], cash: [], friends: [], bills: [], settles: [] };
 }
 function load() {
   try {
@@ -362,7 +366,7 @@ function load() {
   return freshState();
 }
 let S = load();
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Could not save: storage is full or blocked'); } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Could not save: storage is full or blocked'); } pcSyncSoon(); }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 /* ---------- helpers ---------- */
@@ -674,8 +678,8 @@ function viewHome() {
   // money in, owed, cash
   const pin = (S.inc || []).filter(x => inRange(x.ts, c.p.start, c.p.end)), inSum = sum(pin.map(x => x.amt));
   if (inSum) h += `<div class="card"><div class="row"><div class="grow"><div class="small muted">Money in this month</div><div class="bold">+${money(inSum, { dec: false })}</div><div class="small muted">${c.income ? 'Added to your budget' : 'Set your income to count it'}</div></div><div style="text-align:right"><div class="small muted">${c.income ? 'Left this month' : 'Net after spending'}</div><div class="bold">${(c.income ? c.spendable - c.spent : inSum - c.spent) < 0 ? '−' : ''}${money(Math.abs(c.income ? c.spendable - c.spent : inSum - c.spent), { dec: false })}</div></div></div></div>`;
-  const ow = owedToMe(), io = iOwe();
-  if (ow || io) h += `<button class="card" style="display:block;width:100%;text-align:left" data-tab="goals"><div class="row"><div class="emoji">🤝</div><div class="grow"><div class="bold">${ow ? money(ow, { dec: false }) + ' owed to you' : money(io, { dec: false }) + ' you owe'}</div><div class="small muted">${ow && io ? money(io, { dec: false }) + ' you owe · ' : ''}Tap to see who</div></div></div></button>`;
+  const bt = buddyTotals(), ow = r2(owedToMe() + bt.owed), io = r2(iOwe() + bt.owe);
+  if (ow || io) h += `<button class="card" style="display:block;width:100%;text-align:left" data-act="bbgo"><div class="row"><div class="emoji">🤝</div><div class="grow"><div class="bold">${ow ? money(ow, { dec: false }) + ' owed to you' : money(io, { dec: false }) + ' you owe'}</div><div class="small muted">${ow && io ? money(io, { dec: false }) + ' you owe · ' : ''}Tap to see who</div></div></div></button>`;
   if ((S.cash || []).length) h += `<button class="card" style="display:block;width:100%;text-align:left" data-tab="settings"><div class="row"><div class="emoji">💵</div><div class="grow"><div class="bold">${money(Math.max(0, cashBalance()), { dec: false })} cash in hand</div><div class="small muted">From your logged ATM withdrawals</div></div></div></button>`;
 
   // goals preview
@@ -835,7 +839,8 @@ function ring(pct) {
 }
 function viewGoals() {
   const c = calc();
-  let h = `<div class="top"><div class="hi">Goals</div><button class="chip" data-act="newgoal">＋ New goal</button></div>`;
+  if (goalsView === 'split') return viewBuddy();
+  let h = `<div class="top"><div class="hi">Goals</div><button class="chip" data-act="newgoal">＋ New goal</button></div>${goalsSeg()}`;
   if (!S.goals.length) h += `<div class="card empty">What are you saving for? A trip, a laptop, an emergency fund?<br><br><button class="btn primary" data-act="newgoal">Create a goal</button></div>`;
   S.goals.forEach(g => {
     const sv = goalSaved(g), pct = g.target ? Math.min(100, sv / g.target * 100) : 0;
@@ -849,8 +854,6 @@ function viewGoals() {
       <div class="small muted">${money(sv)} of ${money(g.target)}${left ? ' · ' + money(left) + ' to go' : ' · Done! 🎉'}</div>${pace ? `<div class="small muted">${pace}</div>` : ''}</div></div>
       <div class="two" style="margin-top:12px"><button class="btn" data-act="goaledit" data-id="${g.id}">Edit</button><button class="btn primary" data-act="deposit" data-id="${g.id}">Add money</button></div></div>`;
   });
-  h += `<h2>Owed</h2><div class="card list">${openIous().length ? openIous().map(o => `<div class="item"><div class="emoji">${o.dir === 'owe' ? '📤' : '📥'}</div><button class="grow" data-act="iouedit" data-id="${o.id}" style="text-align:left"><div class="bold ellipsis">${o.dir === 'owe' ? 'You owe ' : ''}${esc(o.who)}</div><div class="small muted ellipsis">${esc(o.note || 'No note')} · ${relDay(o.ts)}</div></button><div class="bold num">${money(o.amt)}</div>${o.dir === 'owe' ? '' : `<button class="btn ghost small" data-act="ioucopy" data-id="${o.id}" aria-label="Copy a reminder message">📋</button>`}<button class="btn small" data-act="iousettle" data-id="${o.id}">Settle</button></div>`).join('') : `<div class="empty" style="padding:14px 10px">Nobody owes you, and you owe nobody.</div>`}
-    <div class="item"><button class="btn block" data-act="iounew">＋ Add who owes what</button></div></div>`;
   h += `<h2>Skip jar <span class="gs">💪</span></h2><div class="card"><div class="row"><div class="emoji">🫙</div><div class="grow"><div class="bold">${money(c.skippedAll)} not spent</div>
     <div class="small muted">Every time you were about to buy something and didn't, tap <b>Skipped it</b> in the add screen. It goes here and into your first goal.</div></div></div></div>`;
   const recentSaves = [...S.saves].sort((a, b) => b.ts - a.ts).slice(0, 8);
@@ -927,6 +930,7 @@ function viewSettings() {
     <button class="btn block" data-act="smstest">Try it</button>
   </div>
 
+  ${pcCard()}
   <h2>Cash wallet</h2><div class="card"><div class="row"><div class="emoji">💵</div><div class="grow"><div class="bold">${(S.cash || []).length ? money(Math.max(0, cashBalance()), { dec: false }) + ' in hand' : 'Track your cash'}</div>
     <div class="small muted">${(S.cash || []).length ? 'Withdrawals minus expenses you logged as Cash.' : 'Log ATM withdrawals and Kharcha counts down what is left.'}</div></div></div>
     ${[...(S.cash || [])].sort((a, b) => b.ts - a.ts).slice(0, 4).map(x => `<div class="row small" style="margin-top:10px"><span class="grow muted">${relDay(x.ts)}${x.note ? ' · ' + esc(x.note) : ''}</span><span class="bold">+${money(x.amt, { dec: false })}</span><button class="btn ghost small" data-act="cashdel" data-id="${x.id}" aria-label="Remove">✕</button></div>`).join('')}
@@ -1073,7 +1077,7 @@ function renderAdd() {
     ${catBudgetHint}
     <input id="note" placeholder="${isIn ? 'Note (e.g. salary, Amazon refund)' : 'Note (what was it?)'}" value="${esc(d.note)}" maxlength="80" autocomplete="off" style="margin:8px 0 10px">
     ${d.more ? `<div class="modes">${['UPI', 'Card', 'Cash'].map(m => `<button data-mode="${m}" class="${d.mode === m ? 'on' : ''}">${m}</button>`).join('')}<input id="when" type="datetime-local" value="${local}" style="flex:1.6;padding:6px 8px;font-size:13px"></div>`
-      : `<div class="whenchip" style="gap:8px;flex-wrap:wrap"><button class="chip" data-act="addmore">${relDay(d.ts)} ${timeStr(d.ts)}${isIn ? '' : ' · ' + esc(d.mode)} ▾</button>${isIn ? '' : `<button class="chip" data-act="splitcycle">${d.split > 1 ? `Split ${d.split} ways · yours ${money(share)}` : 'Split bill'}</button>`}${isIn ? '' : d.photo ? `<img id="rimg" class="rthumb" data-act="viewphoto" alt="Receipt">` : `<button class="chip" data-act="attach">📎 Receipt</button>`}</div>`}
+      : `<div class="whenchip" style="gap:8px;flex-wrap:wrap"><button class="chip" data-act="addmore">${relDay(d.ts)} ${timeStr(d.ts)}${isIn ? '' : ' · ' + esc(d.mode)} ▾</button>${isIn ? '' : `<button class="chip" data-act="splitcycle">${d.split > 1 ? `Split ${d.split} ways · yours ${money(share)}` : 'Split bill'}</button>`}${isIn || d.editing ? '' : `<button class="chip" data-act="bbfromadd">👥 With friends</button>`}${isIn ? '' : d.photo ? `<img id="rimg" class="rthumb" data-act="viewphoto" alt="Receipt">` : `<button class="chip" data-act="attach">📎 Receipt</button>`}</div>`}
     <div class="pad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map(k => `<button data-key="${k}">${k}</button>`).join('')}</div>
     <div class="actions">${d.editing ? `<button class="btn danger" data-act="deltx">Delete</button>` : isIn ? `<button class="btn" data-act="close">Cancel</button>` : `<button class="btn" data-act="skip" title="You were going to buy it, and didn't">Skipped it <span class="gs">💪</span></button>`}
       <button class="btn primary" data-act="savetx">${d.editing ? 'Update' : 'Save'}</button></div>
@@ -1460,6 +1464,7 @@ async function nativeSync() {
 document.addEventListener('click', e => {
   const t = e.target.closest('button, [data-tab]'); if (!t) return;
   if (t.dataset.tab) { go(t.dataset.tab); return; }
+  if (buddyClick(t) || pcClick(t)) return;
   if (t.dataset.key) { tick(); padKey(t.dataset.key); return; }
   if (t.dataset.cat && draft) {
     tick(10); syncDraftInputs();
@@ -1502,7 +1507,8 @@ document.addEventListener('click', e => {
   const act = t.dataset.act, id = t.dataset.id;
   switch (act) {
     case 'add': openAdd(); break;
-    case 'edit': openAdd({ id }); break;
+    case 'edit': { const bill = id && id.startsWith('bill-') && (S.bills || []).find(b => 'bill-' + b.id === id); if (bill) billForm(bill); else openAdd({ id }); break; }
+    case 'bbgo': goalsView = 'split'; go('goals'); break;
     case 'savetx': saveTx(); break;
     case 'skip': skipTx(); break;
     case 'deltx': {
@@ -1638,11 +1644,12 @@ document.addEventListener('keydown', e => {
 })();
 window.addEventListener('hashchange', () => { if (location.hash.startsWith('#add')) handleIncoming(); });
 // refresh numbers when the app comes back to the front (day may have changed)
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); runSubs(); render(); nativeSync(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !draft) { S = load(); runSubs(); render(); nativeSync(); pcSyncSoon(600); } });
 
 runSubs();
 render();
 handleIncoming();
+pcSyncSoon(1500);
 startupSheets();
 // Android app: kharcha://add?text=... from MacroDroid
 if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {

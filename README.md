@@ -15,6 +15,7 @@ Everything stays on your phone. No account, no server, no bank login.
 - **Safe to spend today**: (income − savings target − spent so far) ÷ days left in the month. Month can start on your payday.
 - **Skipped it 💪**: about to buy something and didn't? Log it as skipped and the money counts toward your goal.
 - **Goals** with progress rings, deadlines and the monthly pace you need. Confetti at 25 / 50 / 75 / 100%.
+- **Bill Buddy**: split a bill with friends (equally or exact amounts), see who owes what, settle up, and ask for money with a UPI link, QR code or a WhatsApp message. Your share is logged as an expense. Pay a friend back in one tap with their UPI ID.
 - **Streaks**: days in a row under your daily budget (or days logged, if you haven't set an income).
 - Category budgets, history with search, CSV export, JSON backup and restore, dark and light themes, works offline.
 

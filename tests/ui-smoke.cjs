@@ -3,7 +3,7 @@
 const { chromium } = require('playwright');
 const native = process.argv[2] === 'native';
 (async () => {
-  const b = await chromium.launch();
+  const b = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
   const ctx = await b.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
   const p = await ctx.newPage();
   const errs = [];
@@ -47,7 +47,7 @@ const native = process.argv[2] === 'native';
   await step('edit', async () => { await tap('#app [data-act=edit]'); await p.waitForTimeout(300); await tap('[data-key="⌫"]'); await tap('[data-act=savetx]'); await p.waitForTimeout(300); });
   await step('history', async () => { await tap('nav [data-tab=history]'); await p.fill('#histq', 'zom'); await p.fill('#histq', ''); await tap('[data-hist=month]'); await tap('[data-hcat=food]'); await tap('[data-hcat=""]'); await tap('[data-hview=insights]'); await p.waitForTimeout(300); await tap('[data-hview=list]'); await tap('[data-hist=in]'); });
   await step('goals', async () => { await tap('nav [data-tab=goals]'); await tap('[data-act=deposit]'); await p.fill('#d-amt', '7000'); await tap('[data-act=depositsave]'); await p.waitForTimeout(1200);
-    await tap('[data-act=iounew]'); await p.fill('#i-who', 'Rohan'); await p.fill('#i-amt', '200'); await tap('[data-act=iousave]'); await tap('[data-act=iousettle]'); });
+    await tap('[data-gview=split]'); await tap('[data-act=iounew]'); await p.fill('#i-who', 'Rohan'); await p.fill('#i-amt', '200'); await tap('[data-act=iousave]'); await tap('[data-act=iousettle]'); });
   await step('settings', async () => { await tap('nav [data-tab=settings]'); await tap('[data-act=subnew]'); await p.fill('#s-name', 'Netflix'); await p.fill('#s-amt', '199'); await tap('[data-act=subsave]');
     await tap('[data-act=catnew]'); await p.fill('#c-name', 'Gym'); await tap('[data-act=catsave]'); await tap('[data-act=catup]');
     await tap('[data-act=cashnew]'); await p.fill('#k-amt', '2000'); await tap('[data-act=cashsave]');
