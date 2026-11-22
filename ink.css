@@ -121,3 +121,16 @@ nav.tabs .fab:active { transform: translate(3px, 3px) rotate(90deg) scale(.95); 
 .code, code { border: 1.5px solid var(--k); }
 .glow { background: radial-gradient(60% 40% at 50% -5%, color-mix(in srgb, var(--pop) 18%, transparent), transparent 70%); }
 .rimg, .rthumb { border: 2px solid var(--k); }
+
+/* ---------- enhancement loop (Nov 2026) ---------- */
+/* quick repeat picks in the add sheet */
+.amount .hint .quick { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 4px -18px 0; padding: 4px 18px 6px; justify-content: safe center; }
+.amount .hint .quick::-webkit-scrollbar { display: none; }
+.quick .chip { flex: none; padding: 6px 11px; font-size: 12.5px; color: var(--ink); box-shadow: 2px 2px 0 var(--k); animation: qpop .45s var(--spring) both; animation-delay: var(--d, 0ms); }
+.quick .chip b { font-family: var(--num); margin-left: 2px; }
+.quick .chip:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--k); }
+@keyframes qpop { from { opacity: 0; transform: translateY(8px) scale(.85); } }
+/* insights month switcher */
+.mswitch { display: flex; align-items: center; gap: 12px; text-align: center; margin: 0 0 4px; }
+.mswitch .btn { min-width: 44px; min-height: 40px; font-size: 18px; }
+.mswitch .btn[disabled] { opacity: .3; box-shadow: none; }
