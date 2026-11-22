@@ -92,7 +92,7 @@ for f in glob.glob('native/res/*/*.xml'):
 res = 'android/app/src/main/res'
 shutil.rmtree(res + '/mipmap-anydpi-v26', ignore_errors=True)
 for d in glob.glob('native/icons/mipmap-*'):
-    for f in glob.glob(d + '/*.png'):
+    for f in glob.glob(d + '/*.png') + glob.glob(d + '/*.xml'):  # PNGs + adaptive icon (QT Suite icon family)
         os.makedirs(res + '/' + os.path.basename(d), exist_ok=True)
         shutil.copy(f, res + '/' + os.path.basename(d) + '/' + os.path.basename(f))
 for f in glob.glob(res + '/drawable*/splash.png'):

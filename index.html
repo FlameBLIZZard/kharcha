@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Kharcha</title>
 <meta name="description" content="Log an expense in two taps, and save before you spend.">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#16141a">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -308,6 +308,7 @@ html.sheet-open nav.tabs .fab { transform: rotate(45deg) scale(.9); }
 .empty { animation: up .6s var(--spring) both; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
+<link rel="stylesheet" href="ink.css">
 </head>
 <body>
 <div id="app"></div>
@@ -614,7 +615,7 @@ function go(t) {
 }
 function render(enter) {
   document.documentElement.dataset.theme = S.settings.theme || 'dark';
-  document.querySelector('meta[name=theme-color]').content = S.settings.theme === 'light' ? '#ffffff' : '#000000';
+  document.querySelector('meta[name=theme-color]').content = S.settings.theme === 'light' ? '#fff8ec' : '#16141a';
   if (!S.settings.onboarded || replay) { $('#tabs').hidden = true; renderOnboarding(); return; }
   if (IS_APP && KN && !natLoaded) { $('#tabs').hidden = true; $('#app').innerHTML = ''; return; }   // wait for the permission check
   if (permNeeded()) { $('#tabs').hidden = true; renderPerms(); return; }
