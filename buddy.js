@@ -73,7 +73,7 @@ function viewBuddy() {
   let h = `<div class="top"><div class="hi">Bill Buddy</div><button class="chip" data-act="bbfriendnew">＋ Friend</button></div>${goalsSeg()}`;
   const square = !t.owed && !t.owe;
   h += `<div class="card hero bbhero"><div class="label">${square ? 'Between you and your friends' : t.owed >= t.owe ? 'Friends owe you' : 'You owe friends'}</div>
-    <div class="big" data-count="${Math.round(square ? 0 : Math.max(t.owed, t.owe))}">${square ? 'All square' : money(Math.max(t.owed, t.owe), { dec: false })}</div>
+    <div class="big"${square ? '' : ` data-count="${Math.round(Math.max(t.owed, t.owe))}"`}>${square ? 'All square' : money(Math.max(t.owed, t.owe), { dec: false })}</div>
     <div class="line">${square ? (S.bills.length ? 'Nobody owes anybody. Nice.' : 'Split a dinner, a cab or a trip. Kharcha keeps score.') : t.owed && t.owe ? `You owe ${money(t.owe, { dec: false })} on the other side` : t.owed ? 'Tap a friend to ask with a UPI link or QR' : 'Tap a friend to pay them by UPI'}</div>
     <button class="btn block bbsplit" data-act="bbnew">＋ Split a bill</button></div>`;
   h += `<h2>Friends</h2><div class="card list">${fr.length ? fr.map(f => { const b = balanceOf(f.id);
@@ -223,7 +223,12 @@ function recordSettle(fid, amt, dir, note) {
   const left = balanceOf(fid);
   toast(Math.abs(left) < .01 ? `Settled up with ${pname(fid)} 🤝` : left > 0 ? `Saved · ${pname(fid)} still owes ${money(left)}` : `Saved · you still owe ${money(-left)}`, 5000,
     { label: 'Undo', fn: () => { S.settles = S.settles.filter(x => x.id !== s.id); save(); render(); if ($('#sheet').classList.contains('show')) friendSheet(fid); } });
-  if (Math.abs(left) < .01) confetti();
+  if (Math.abs(left) < .01) { confetti(); stamp('Settled!'); }
+}
+
+function stamp(text) {
+  const el = document.createElement('div'); el.className = 'stamp'; el.innerHTML = `<b>${esc(text)}</b>`;
+  document.body.appendChild(el); setTimeout(() => el.classList.add('out'), 1100); setTimeout(() => el.remove(), 1500);
 }
 
 /* ---------- ask for money ---------- */

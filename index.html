@@ -616,6 +616,7 @@ function countUps() {
 }
 
 /* ---------- routing / render ---------- */
+let heroLast = null, streakLast = null, swallowClick = 0;
 let tab = 'home', histFilter = 'all', histQuery = '', histCat = '', histView = 'list';
 const TAB_I = { home: 0, history: 1, goals: 3, settings: 4 };
 function go(t) {
@@ -640,6 +641,7 @@ function render(enter) {
   const idx = { home: 0, history: 1, goals: 3, settings: 4 }[tab];
   $('#ind').style.setProperty('--i', idx);
   countUps();
+  { const hv = $('#app .hero .big'); if (hv) { const v = hv.dataset.count; if (!enter && heroLast !== null && v !== heroLast) bumpEl(hv.closest('.hero'), 'jolt'); heroLast = v; } }
   pushNative();
 }
 
@@ -649,8 +651,9 @@ function viewHome() {
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const name = S.settings.name ? ', ' + esc(S.settings.name) : '';
   let h = `<div class="top"><div><div class="hi">${hello}${name}</div><div class="sub">${c.p.start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} to ${new Date(+c.p.end - DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${c.daysLeft} day${c.daysLeft > 1 ? 's' : ''} left</div></div>
-    <span class="chip fire${st.n ? '' : ' zero'}" title="${st.mode === 'budget' ? 'Days in a row under your daily budget' : 'Days in a row you logged something'}"><span class="gs">🔥</span> ${st.n ? st.n + '-day streak' : st.mode === 'budget' ? 'New streak tomorrow' : 'Log one to start'}</span></div>`;
+    <span class="chip fire${st.n ? '' : ' zero'}${streakLast !== null && st.n > streakLast ? ' up' : ''}" title="${st.mode === 'budget' ? 'Days in a row under your daily budget' : 'Days in a row you logged something'}"><span class="gs">🔥</span> ${st.n ? st.n + '-day streak' : st.mode === 'budget' ? 'New streak tomorrow' : 'Log one to start'}</span></div>`;
 
+  setTimeout(() => { streakLast = st.n; }, 0);
   // hero
   if (c.income) {
     const pct = c.spendable ? Math.min(100, c.spent / c.spendable * 100) : 100;
@@ -717,7 +720,7 @@ function viewHome() {
         const prev = sum(S.tx.filter(t => inRange(t.ts, pp.start, new Date(+pp.start + elapsed * DAY))).map(t => t.amt));
         if (!prev) return ''; const diff = cur - prev;
         return `<div class="small muted" style="margin-top:8px">${diff <= 0 ? money(-diff, { dec: false }) + ' less' : money(diff, { dec: false }) + ' more'} than this time last month</div>`; })()}
-      <div class="week" role="img" aria-label="Spending per day for the last 7 days">${days.map((x, i) => `<div class="d ${i === 6 ? 'today' : ''}"><div class="track"><div class="b" style="height:${Math.max(4, x.v / mx * 100)}%;animation-delay:${i * 50}ms"></div></div><div class="l">${i === 6 ? 'Today' : x.d.toLocaleDateString('en-IN', { weekday: 'narrow' })}</div></div>`).join('')}</div><button class="btn block ghost small" style="margin-top:10px" data-act="gotoins">See all graphs ›</button></div>`;
+      <div class="week" role="img" aria-label="Spending per day for the last 7 days">${days.map((x, i) => `<div class="d ${i === 6 ? 'today' : ''}" data-tip="${x.d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} · ${money(x.v, { dec: false })}"><div class="track"><div class="b" style="height:${Math.max(4, x.v / mx * 100)}%;animation-delay:${i * 50}ms"></div></div><div class="l">${i === 6 ? 'Today' : x.d.toLocaleDateString('en-IN', { weekday: 'narrow' })}</div></div>`).join('')}</div><button class="btn block ghost small" style="margin-top:10px" data-act="gotoins">See all graphs ›</button></div>`;
   }
 
   // categories
@@ -774,7 +777,7 @@ function viewInsights() {
   // 1. daily bars with budget line
   const mx = Math.max(...per, dailyBudget, 1);
   h += `<h2>Every day${past ? '' : ' this month'}</h2><div class="card"><div class="row"><div class="grow bold">${money(c.spent, { dec: false })}</div>${dailyBudget ? `<div class="small muted">dashed line = ${money(dailyBudget, { dec: false })} a day</div>` : ''}</div>
-    <div class="dbars" role="img" aria-label="Spending for each day of the period">${dailyBudget ? `<i class="bline" style="bottom:${dailyBudget / mx * 100}%"></i>` : ''}${per.map((v, i) => `<div class="db ${i === todayI ? 'today' : ''} ${i > todayI ? 'future' : ''}" style="height:${v ? Math.max(3, v / mx * 100) : 1.5}%;animation-delay:${i * 12}ms"></div>`).join('')}</div>
+    <div class="dbars" role="img" aria-label="Spending for each day of the period">${dailyBudget ? `<i class="bline" style="bottom:${dailyBudget / mx * 100}%"></i>` : ''}${per.map((v, i) => `<div class="db ${i === todayI ? 'today' : ''} ${i > todayI ? 'future' : ''}" data-tip="${new Date(+p.start + i * DAY + 12 * 36e5).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${money(v, { dec: false })}" style="height:${v ? Math.max(3, v / mx * 100) : 1.5}%;animation-delay:${i * 12}ms"></div>`).join('')}</div>
     <div class="row small muted" style="margin-top:6px"><span class="grow">${p.start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span><span>${new Date(+p.end - DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span></div></div>`;
 
   // 2. cumulative vs pace
@@ -1155,6 +1158,7 @@ function saveTx() {
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
   save();
   const wasEdit = draft.editing; if (!wasEdit) markFresh(tx.id); closeSheet(); render();
+  if (!wasEdit) setTimeout(() => bumpEl($('nav.tabs .fab'), 'boing'), 120);
   if (navigator.vibrate) navigator.vibrate(15);
   const c = calc();
   const undo = { label: 'Undo', fn: () => { S.tx = S.tx.filter(x => x.id !== tx.id); if (iou) S.ious = S.ious.filter(x => x.id !== iou.id); save(); render(); toast('Removed'); } };
@@ -1490,6 +1494,7 @@ async function nativeSync() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
+  if (Date.now() - swallowClick < 450) { e.preventDefault(); return; }
   const t = e.target.closest('button, [data-tab]'); if (!t) return;
   if (t.dataset.tab) { go(t.dataset.tab); return; }
   if (buddyClick(t) || pcClick(t)) return;
@@ -1642,6 +1647,42 @@ document.addEventListener('click', e => {
   }
 });
 $('#scrim').addEventListener('click', closeSheet);
+function deleteRow(id) {
+  const tx = S.tx.find(x => x.id === id), inc = !tx && (S.inc || []).find(x => x.id === id);
+  if (tx) { S.tx = S.tx.filter(x => x.id !== id); save(); render(); tick(20); toast('Deleted ' + money(tx.amt), 5000, { label: 'Undo', fn: () => { if (!S.tx.some(x => x.id === id)) { S.tx.push(tx); markFresh(id); save(); render(); } } }); }
+  else if (inc) { S.inc = S.inc.filter(x => x.id !== id); save(); render(); tick(20); toast('Deleted +' + money(inc.amt), 5000, { label: 'Undo', fn: () => { S.inc.push(inc); markFresh(id); save(); render(); } }); }
+}
+(() => {   // swipe left on an expense row: it follows your finger, past a third it deletes, otherwise it springs back
+  let el = null, x0 = 0, y0 = 0, dx = 0, on = false;
+  document.addEventListener('touchstart', e => {
+    const it = e.target.closest('#app .list button.item[data-act=edit]');
+    el = it && !draft && !it.dataset.id.startsWith('bill-') ? it : null; if (!el) return;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!el) return;
+    const x = e.touches[0].clientX - x0, y = e.touches[0].clientY - y0;
+    if (!on) { if (x < -12 && Math.abs(x) > Math.abs(y) * 1.4) { on = true; el.classList.add('swiping'); } else if (Math.abs(y) > 10 || x > 12) { el = null; return; } else return; }
+    dx = Math.min(0, x + 12); el.style.transform = `translateX(${dx}px)`;
+    const k = Math.min(1, -dx / (el.offsetWidth * .35)); el.style.setProperty('--sw', k);
+    if (k >= 1 && !el.dataset.armed) { el.dataset.armed = '1'; tick(12); } else if (k < 1 && el.dataset.armed) delete el.dataset.armed;
+  }, { passive: true });
+  const end = () => {
+    if (!el) return; const it = el; el = null; if (!on) return;
+    swallowClick = Date.now(); it.classList.remove('swiping'); it.style.removeProperty('--sw');
+    if (it.dataset.armed) { it.classList.add('gone'); setTimeout(() => deleteRow(it.dataset.id), 230); }
+    else it.style.transform = '';
+  };
+  document.addEventListener('touchend', end, { passive: true }); document.addEventListener('touchcancel', end, { passive: true });
+})();
+document.addEventListener('click', e => {   // tap a chart bar to read its amount
+  const b = e.target.closest('[data-tip]'); document.querySelectorAll('.tipbub').forEach(x => x.remove()); if (!b) return;
+  const box = b.parentElement, t = document.createElement('span'); t.className = 'tipbub'; t.textContent = b.dataset.tip;
+  box.appendChild(t); const x = b.offsetLeft + b.offsetWidth / 2, w = t.offsetWidth;
+  t.style.left = Math.max(0, Math.min(box.clientWidth - w, x - w / 2)) + 'px'; t.style.setProperty('--ax', (x - Math.max(0, Math.min(box.clientWidth - w, x - w / 2))) + 'px');
+  b.classList.add('picked'); setTimeout(() => b.classList.remove('picked'), 600); tick(5);
+  clearTimeout(window.__tipT); window.__tipT = setTimeout(() => t.remove(), 2600);
+});
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'histq') { histQuery = t.value; const pos = t.selectionStart; render(); const n = $('#histq'); n.focus(); n.setSelectionRange(pos, pos); return; }

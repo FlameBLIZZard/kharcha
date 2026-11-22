@@ -134,3 +134,60 @@ nav.tabs .fab:active { transform: translate(3px, 3px) rotate(90deg) scale(.95); 
 .mswitch { display: flex; align-items: center; gap: 12px; text-align: center; margin: 0 0 4px; }
 .mswitch .btn { min-width: 44px; min-height: 40px; font-size: 18px; }
 .mswitch .btn[disabled] { opacity: .3; box-shadow: none; }
+
+/* round 6: save feedback */
+.hero.jolt { animation: jolt .55s var(--spring); }
+@keyframes jolt { 0% { transform: none; } 30% { transform: translate(-3px, -3px) rotate(-.6deg); box-shadow: 9px 9px 0 var(--k); } 100% { transform: none; } }
+nav.tabs .fab.boing { animation: boing .6s var(--spring); }
+@keyframes boing { 0% { transform: scale(1); } 25% { transform: scale(1.18, .82); } 50% { transform: scale(.9, 1.12) rotate(-8deg); } 100% { transform: none; } }
+.list .item.fresh { animation: stampin .7s var(--spring); }
+@keyframes stampin { 0% { opacity: 0; transform: translateX(40px) rotate(2deg) scale(.96); background: color-mix(in srgb, var(--pop) 30%, transparent); } 55% { opacity: 1; transform: none; background: color-mix(in srgb, var(--pop) 22%, transparent); } 100% { background: transparent; } }
+.toast.show { animation: toastin .5s var(--spring); }
+@keyframes toastin { from { transform: translateX(-50%) translateY(30px) rotate(-3deg) scale(.9); } }
+
+/* round 7: swipe to delete */
+.card.list { overflow: hidden; }
+.list button.item { position: relative; transition: transform .45s var(--spring), opacity .2s, background .2s; }
+.list button.item::after { content: "Delete"; position: absolute; top: 0; bottom: 0; left: 100%; width: 100vw; display: flex; align-items: center; padding-left: 18px; font: 400 14px var(--display); color: var(--pop-ink); background: var(--bad); opacity: calc(.35 + var(--sw, 0) * .65); }
+.list button.item.swiping { transition: none; }
+.list button.item[data-armed]::after { content: "Let go to delete"; }
+.list button.item.gone { transform: translateX(-110%) !important; opacity: 0; transition: transform .25s ease-in, opacity .25s; }
+
+/* round 8: microanimations */
+.chip.fire.up { animation: lvlup .9s var(--spring); }
+.chip.fire.up .gs { animation: flame .9s var(--spring); }
+@keyframes lvlup { 0% { transform: scale(1); } 30% { transform: scale(1.25) rotate(-4deg); box-shadow: 0 0 0 6px color-mix(in srgb, var(--warn) 45%, transparent); } 100% { transform: none; box-shadow: 0 0 0 14px transparent; } }
+@keyframes flame { 30% { transform: translateY(-6px) scale(1.5); } }
+.bar.bad > i, .bar.warn > i { background-image: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(0, 0, 0, .18) 6px 12px); background-size: 34px 34px; animation: grow 1s var(--spring) both, march 1.2s linear infinite; }
+.bar.bad > i { background-color: var(--bad); } .bar.warn > i { background-color: var(--warn); opacity: 1; }
+@keyframes march { to { background-position: 34px 0; } }
+.pad button:active { animation: keypop .25s var(--spring); }
+@keyframes keypop { 50% { font-size: 26px; } }
+.cat:active { transform: translate(2px, 2px) scale(.96); }
+.emoji { transition: transform .4s var(--spring); }
+.list button.item:active .emoji { transform: rotate(-10deg) scale(1.1); }
+
+/* round 9: Bill Buddy */
+.stamp { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; pointer-events: none; }
+.stamp b { font: 400 54px var(--display); color: var(--pop); -webkit-text-stroke: 3px var(--k); paint-order: stroke fill; padding: 8px 22px; border: 5px solid var(--k); border-radius: 18px; background: color-mix(in srgb, var(--bg) 80%, transparent); box-shadow: 8px 8px 0 var(--k); transform: rotate(-9deg); animation: slam .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+.stamp.out b { animation: unslam .35s ease-in both; }
+@keyframes slam { from { transform: rotate(-20deg) scale(2.4); opacity: 0; } 60% { opacity: 1; } }
+@keyframes unslam { to { transform: rotate(-9deg) scale(.6); opacity: 0; } }
+.list .item .av { animation: avpop .5s var(--spring) both; }
+.list .item:nth-child(2) .av { animation-delay: .05s; } .list .item:nth-child(3) .av { animation-delay: .1s; } .list .item:nth-child(n+4) .av { animation-delay: .15s; }
+@keyframes avpop { from { transform: scale(0) rotate(-30deg); } }
+.pill.in, .pill.out { animation: nudge 2.8s ease-in-out infinite; }
+@keyframes nudge { 0%, 84%, 100% { transform: none; } 90% { transform: translateX(-3px) rotate(-3deg); } 95% { transform: translateX(2px); } }
+.bbbal .bignum { animation: up .5s var(--spring) both; }
+
+/* round 10: tap a bar for its amount */
+.week { position: relative; }
+.week .d, .dbars .db { cursor: pointer; }
+.week .d.picked .b, .dbars .db.picked { filter: brightness(1.3); transform: scaleY(1.06); transition: transform .3s var(--spring); }
+.tipbub { position: absolute; top: -34px; z-index: 3; white-space: nowrap; font: 600 11.5px var(--mono); padding: 5px 9px; border-radius: 9px; background: var(--ink); color: var(--bg); border: 2px solid var(--k); box-shadow: 2px 2px 0 var(--k); pointer-events: none; animation: tipin .35s var(--spring) both; }
+.tipbub::after { content: ""; position: absolute; left: var(--ax, 50%); bottom: -7px; width: 10px; height: 10px; margin-left: -5px; background: var(--ink); border: 2px solid var(--k); border-top: 0; border-left: 0; transform: rotate(45deg); }
+@keyframes tipin { from { opacity: 0; transform: translateY(8px) scale(.8); } }
+.mswitch + h2, .mswitch ~ .card { animation-duration: .5s; }
+@media (prefers-reduced-motion: reduce) { .bar.bad > i, .bar.warn > i, .pill.in, .pill.out { animation: none; } .stamp b { animation: none; } }
+.list button.item:not(.swiping):not(.gone)::after { display: none; }
+html, body { overflow-x: clip; }
