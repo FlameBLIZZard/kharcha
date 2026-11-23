@@ -1,6 +1,6 @@
 {
   "name": "kharcha",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Log an expense in two taps, and save before you spend. Installable offline web app, with an Android APK build.",
   "scripts": {

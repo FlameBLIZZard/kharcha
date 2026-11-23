@@ -500,6 +500,12 @@ function runSubs() {
   if (!Array.isArray(S.subs)) S.subs = [];
   let n = 0; const now = new Date();
   S.subs.forEach(sub => {
+    if (!sub.since) sub.since = Date.now();   // older subs: catch-up starts from today
+    // missed last month entirely (app not opened)? log it too, but never for a month before the sub existed
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1), pdue = dueDate(sub, prev), pkey = monthKey(prev);
+    if (sub.since && +pdue >= sub.since && sub.last !== pkey && sub.last !== monthKey(now) && !S.tx.some(t => t.id === 'sub-' + sub.id + '-' + pkey)) {
+      S.tx.push({ id: 'sub-' + sub.id + '-' + pkey, amt: sub.amt, cat: sub.cat || 'subscriptions', note: sub.name, mode: 'UPI', ts: +pdue, src: 'recurring' }); sub.last = pkey; n++;
+    }
     const due = dueDate(sub, now), key = monthKey(now);
     if (sub.last === key || +now < +due) return;
     sub.last = key;
@@ -554,7 +560,7 @@ function calc() {
 function streak() {
   // Under-budget streak: days in a row where spending stayed under the average daily allowance.
   // Without an income set, it becomes a logging streak (days with at least one entry or skip).
-  const income = +S.settings.income || 0, target = +S.settings.saveTarget || 0;
+  const income = effIncome(period()) || +S.settings.income || 0, target = +S.settings.saveTarget || 0;
   const byDay = {};
   S.tx.forEach(t => { const k = dayKey(t.ts); byDay[k] = (byDay[k] || 0) + t.amt; });
   const logged = new Set([...S.tx.map(t => dayKey(t.ts)), ...S.saves.map(s => dayKey(s.ts))]);
@@ -610,6 +616,7 @@ function countUps() {
 }
 
 /* ---------- routing / render ---------- */
+let heroLast = null, streakLast = null, swallowClick = 0;
 let tab = 'home', histFilter = 'all', histQuery = '', histCat = '', histView = 'list';
 const TAB_I = { home: 0, history: 1, goals: 3, settings: 4 };
 function go(t) {
@@ -634,6 +641,7 @@ function render(enter) {
   const idx = { home: 0, history: 1, goals: 3, settings: 4 }[tab];
   $('#ind').style.setProperty('--i', idx);
   countUps();
+  { const hv = $('#app .hero .big'); if (hv) { const v = hv.dataset.count; if (!enter && heroLast !== null && v !== heroLast) bumpEl(hv.closest('.hero'), 'jolt'); heroLast = v; } }
   pushNative();
 }
 
@@ -643,8 +651,9 @@ function viewHome() {
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const name = S.settings.name ? ', ' + esc(S.settings.name) : '';
   let h = `<div class="top"><div><div class="hi">${hello}${name}</div><div class="sub">${c.p.start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} to ${new Date(+c.p.end - DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${c.daysLeft} day${c.daysLeft > 1 ? 's' : ''} left</div></div>
-    <span class="chip fire${st.n ? '' : ' zero'}" title="${st.mode === 'budget' ? 'Days in a row under your daily budget' : 'Days in a row you logged something'}"><span class="gs">🔥</span> ${st.n ? st.n + '-day streak' : st.mode === 'budget' ? 'New streak tomorrow' : 'Log one to start'}</span></div>`;
+    <span class="chip fire${st.n ? '' : ' zero'}${streakLast !== null && st.n > streakLast ? ' up' : ''}" title="${st.mode === 'budget' ? 'Days in a row under your daily budget' : 'Days in a row you logged something'}"><span class="gs">🔥</span> ${st.n ? st.n + '-day streak' : st.mode === 'budget' ? 'New streak tomorrow' : 'Log one to start'}</span></div>`;
 
+  setTimeout(() => { streakLast = st.n; }, 0);
   // hero
   if (c.income) {
     const pct = c.spendable ? Math.min(100, c.spent / c.spendable * 100) : 100;
@@ -711,7 +720,7 @@ function viewHome() {
         const prev = sum(S.tx.filter(t => inRange(t.ts, pp.start, new Date(+pp.start + elapsed * DAY))).map(t => t.amt));
         if (!prev) return ''; const diff = cur - prev;
         return `<div class="small muted" style="margin-top:8px">${diff <= 0 ? money(-diff, { dec: false }) + ' less' : money(diff, { dec: false }) + ' more'} than this time last month</div>`; })()}
-      <div class="week" role="img" aria-label="Spending per day for the last 7 days">${days.map((x, i) => `<div class="d ${i === 6 ? 'today' : ''}"><div class="track"><div class="b" style="height:${Math.max(4, x.v / mx * 100)}%;animation-delay:${i * 50}ms"></div></div><div class="l">${i === 6 ? 'Today' : x.d.toLocaleDateString('en-IN', { weekday: 'narrow' })}</div></div>`).join('')}</div><button class="btn block ghost small" style="margin-top:10px" data-act="gotoins">See all graphs ›</button></div>`;
+      <div class="week" role="img" aria-label="Spending per day for the last 7 days">${days.map((x, i) => `<div class="d ${i === 6 ? 'today' : ''}" data-tip="${x.d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} · ${money(x.v, { dec: false })}"><div class="track"><div class="b" style="height:${Math.max(4, x.v / mx * 100)}%;animation-delay:${i * 50}ms"></div></div><div class="l">${i === 6 ? 'Today' : x.d.toLocaleDateString('en-IN', { weekday: 'narrow' })}</div></div>`).join('')}</div><button class="btn block ghost small" style="margin-top:10px" data-act="gotoins">See all graphs ›</button></div>`;
   }
 
   // categories
@@ -725,8 +734,8 @@ function viewHome() {
       const s = byCat[ct.id] || 0, b = +ct.budget || 0;
       const pct = b ? Math.min(100, s / b * 100) : s / max * 100;
       const cls = b && s > b ? 'bad' : b && s > b * .8 ? 'warn' : '';
-      h += `<div class="item"><div class="emoji">${ct.emoji}</div><div class="grow"><div class="row"><span class="grow bold">${esc(ct.name)}</span><span class="num ${cls}">${money(s)}${b ? `<span class="muted"> / ${money(b, { dec: false })}</span>` : ''}</span></div>
-        <div class="bar thin ${cls}"><i style="width:${pct}%"></i></div></div></div>`;
+      h += `<button class="item" data-act="catgo" data-id="${ct.id}" aria-label="See ${esc(ct.name)} spends"><div class="emoji">${ct.emoji}</div><div class="grow"><div class="row"><span class="grow bold">${esc(ct.name)}</span><span class="num ${cls}">${money(s)}${b ? `<span class="muted"> / ${money(b, { dec: false })}</span>` : ''}</span></div>
+        <div class="bar thin ${cls}"><i style="width:${pct}%"></i></div></div></button>`;
     });
     h += `</div>`;
   }
@@ -749,18 +758,26 @@ function txRow(t) {
 function histToggle() { return `<div class="seg">${[['list', 'List'], ['insights', 'Insights']].map(([k, l]) => `<button data-hview="${k}" class="${histView === k ? 'on' : ''}">${l}</button>`).join('')}</div>`; }
 /* ---------- insights: graphs ---------- */
 const shade = i => `color-mix(in srgb, var(--ink) ${[100, 74, 54, 40, 29, 21, 15][Math.min(i, 6)]}%, var(--panel-2))`;
+let insOff = 0;   // 0 = this month, 1 = last month, ...
+function periodAt(off) { let p = period(); for (let i = 0; i < off; i++) p = period(new Date(+p.start - DAY)); return p; }
+function insMonths() { if (!S.tx.length) return 0; const first = Math.min(...S.tx.map(t => t.ts)); let n = 0; while (n < 36 && +periodAt(n).start > first) n++; return n; }
 function viewInsights() {
   if (S.tx.length < 2) return `<div class="empty">Log a few expenses and your graphs show up here.</div>`;
-  const p = period(), c = calc(), todayI = Math.min(p.days - 1, Math.floor((+startOfDay(Date.now()) - +p.start) / DAY));
+  const maxOff = insMonths(); if (insOff > maxOff) insOff = maxOff;
+  const p = periodAt(insOff), past = insOff > 0, cNow = calc();
+  const txP = S.tx.filter(t => inRange(t.ts, p.start, p.end)), inc = effIncome(p);
+  const c = past ? { txP, spent: sum(txP.map(t => t.amt)), spendable: Math.max(0, inc - (+S.settings.saveTarget || 0)) } : cNow;
+  const todayI = past ? p.days - 1 : Math.min(p.days - 1, Math.floor((+startOfDay(Date.now()) - +p.start) / DAY));
+  const mname = p.start.toLocaleDateString('en-IN', { month: 'long', year: p.start.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
   const per = Array.from({ length: p.days }, () => 0);
   c.txP.forEach(t => { const i = Math.floor((+startOfDay(t.ts) - +p.start) / DAY); if (i >= 0 && i < p.days) per[i] += t.amt; });
   const dailyBudget = c.spendable ? c.spendable / p.days : 0;
-  let h = '';
+  let h = `<div class="mswitch"><button class="btn small" data-ins="1" ${insOff >= maxOff ? 'disabled' : ''} aria-label="Earlier month">‹</button><div class="grow"><div class="bold">${mname}</div><div class="small muted">${past ? 'Looking back' : 'This month so far'}</div></div><button class="btn small" data-ins="-1" ${insOff ? '' : 'disabled'} aria-label="Later month">›</button></div>`;
 
   // 1. daily bars with budget line
   const mx = Math.max(...per, dailyBudget, 1);
-  h += `<h2>Every day this month</h2><div class="card"><div class="row"><div class="grow bold">${money(c.spent, { dec: false })}</div>${dailyBudget ? `<div class="small muted">dashed line = ${money(dailyBudget, { dec: false })} a day</div>` : ''}</div>
-    <div class="dbars" role="img" aria-label="Spending for each day of the period">${dailyBudget ? `<i class="bline" style="bottom:${dailyBudget / mx * 100}%"></i>` : ''}${per.map((v, i) => `<div class="db ${i === todayI ? 'today' : ''} ${i > todayI ? 'future' : ''}" style="height:${v ? Math.max(3, v / mx * 100) : 1.5}%;animation-delay:${i * 12}ms"></div>`).join('')}</div>
+  h += `<h2>Every day${past ? '' : ' this month'}</h2><div class="card"><div class="row"><div class="grow bold">${money(c.spent, { dec: false })}</div>${dailyBudget ? `<div class="small muted">dashed line = ${money(dailyBudget, { dec: false })} a day</div>` : ''}</div>
+    <div class="dbars" role="img" aria-label="Spending for each day of the period">${dailyBudget ? `<i class="bline" style="bottom:${dailyBudget / mx * 100}%"></i>` : ''}${per.map((v, i) => `<div class="db ${i === todayI ? 'today' : ''} ${i > todayI ? 'future' : ''}" data-tip="${new Date(+p.start + i * DAY + 12 * 36e5).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${money(v, { dec: false })}" style="height:${v ? Math.max(3, v / mx * 100) : 1.5}%;animation-delay:${i * 12}ms"></div>`).join('')}</div>
     <div class="row small muted" style="margin-top:6px"><span class="grow">${p.start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span><span>${new Date(+p.end - DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span></div></div>`;
 
   // 2. cumulative vs pace
@@ -801,7 +818,7 @@ function viewInsights() {
   // 6. top spends
   const by = {}; c.txP.forEach(t => { const k = (t.note || '').trim().toLowerCase(); if (!k) return; const e = by[k] || (by[k] = { name: t.note.trim(), v: 0, n: 0 }); e.v += t.amt; e.n++; });
   const topS = Object.values(by).sort((a, b) => b.v - a.v).slice(0, 5);
-  if (topS.length) h += `<h2>Biggest this month</h2><div class="card list">${topS.map((e, i) => `<div class="item"><div class="emoji">${i + 1}</div><div class="grow"><div class="bold ellipsis">${esc(e.name)}</div><div class="small muted">${e.n} time${e.n > 1 ? 's' : ''}</div></div><div class="bold num">${money(e.v, { dec: false })}</div></div>`).join('')}</div>`;
+  if (topS.length) h += `<h2>Biggest ${past ? 'in ' + mname : 'this month'}</h2><div class="card list">${topS.map((e, i) => `<div class="item"><div class="emoji">${i + 1}</div><div class="grow"><div class="bold ellipsis">${esc(e.name)}</div><div class="small muted">${e.n} time${e.n > 1 ? 's' : ''}</div></div><div class="bold num">${money(e.v, { dec: false })}</div></div>`).join('')}</div>`;
   return h;
 }
 const histSeg = () => `<div class="seg">${[['all', 'All'], ['month', 'Month'], ['week', '7 days'], ['in', 'Money in']].map(([k, l]) => `<button data-hist="${k}" class="${histFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
@@ -1047,11 +1064,25 @@ function openAdd(pre = {}) {
     : { id: uid(), amtStr: pre.amount ? String(pre.amount) : '', cat: pre.cat || '', note: pre.note || '', mode: pre.mode || 'UPI', ts: pre.ts || Date.now(), src: pre.src || 'manual', kind: pre.kind || '', raw: pre.raw || '', dir: pre.kind === 'credit' ? 'in' : 'out', split: 1 };
   renderAdd();
 }
+/* the spends you repeat (chai, metro, lunch): one tap fills amount, category and note */
+function quickPicks() {
+  const since = Date.now() - 90 * DAY, by = {};
+  S.tx.forEach(t => {
+    if (t.ts < since || t.src === 'bill' || t.src === 'recurring' || !t.amt) return;
+    const note = (t.note || '').trim(), k = note.toLowerCase() + '|' + t.cat + '|' + t.amt;
+    const e = by[k] || (by[k] = { note, cat: t.cat, amt: t.amt, n: 0, last: 0 });
+    e.n++; e.last = Math.max(e.last, t.ts);
+  });
+  return Object.values(by).filter(e => e.n >= 2).map(e => ({ ...e, score: e.n + Math.max(0, 14 - (Date.now() - e.last) / DAY) / 7 }))
+    .sort((a, b) => b.score - a.score).slice(0, 5);
+}
 function renderAdd() {
   const d = draft, c = calc(), isIn = d.dir === 'in';
   const amt = parseFloat(d.amtStr) || 0;
   let hint = '';
-  if (isIn) hint = amt ? 'Money coming in' : 'Type the amount';
+  const picks = !isIn && !d.editing && !amt ? (d.picks = quickPicks()) : [];
+  if (picks.length) hint = `<div class="quick" role="group" aria-label="Spend again">${picks.map((q, i) => `<button class="chip" data-quick="${i}" style="--d:${i * 45}ms">${catById(q.cat).emoji} ${esc(q.note || catById(q.cat).name)} <b>${money(q.amt)}</b></button>`).join('')}</div>`;
+  else if (isIn) hint = amt ? 'Money coming in' : 'Type the amount';
   else if (!d.editing && amt && c.income) {
     const after = c.leftToday - amt;
     hint = after >= 0 ? `<span class="ok">${money(after, { dec: false })} left to spend today after this</span>` : `<span class="bad">This puts you ${money(-after, { dec: false })} over today's budget</span>`;
@@ -1127,6 +1158,7 @@ function saveTx() {
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
   save();
   const wasEdit = draft.editing; if (!wasEdit) markFresh(tx.id); closeSheet(); render();
+  if (!wasEdit) setTimeout(() => bumpEl($('nav.tabs .fab'), 'boing'), 120);
   if (navigator.vibrate) navigator.vibrate(15);
   const c = calc();
   const undo = { label: 'Undo', fn: () => { S.tx = S.tx.filter(x => x.id !== tx.id); if (iou) S.ious = S.ious.filter(x => x.id !== iou.id); save(); render(); toast('Removed'); } };
@@ -1209,8 +1241,13 @@ function cashForm() {
 }
 
 /* ---------- version, what's new, monthly wrap-up ---------- */
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const CHANGES = [
+  ['⚡', 'Spend again in one tap', 'The add screen offers the things you buy often, like chai or the metro. Tap one and Save.'],
+  ['👈', 'Swipe to delete', 'Swipe an expense left to delete it. Undo is right there.'],
+  ['🗓️', 'Past months', 'History › Insights has arrows to look back at earlier months. Tap any bar to see its amount.'],
+  ['🔎', 'Tap a category', 'On Home, tap a row under Where it went to see just those spends.'],
+  ['🧾', 'Share a bill', 'Open a split bill and share the breakdown with the group.'],
   ['🎬', 'Kharcha Wrapped', 'Your month or year as a loud, animated story. Save it as a reel or images to share. Setup › Kharcha Wrapped.'],
   ['✨', 'Smoother everywhere', 'Buttons, tabs, toggles and charts now move instead of jumping. Drag the add sheet down to close it.'],
   ['🔥', 'Fairer streak', 'Today counts toward your streak the moment you are under the safe-to-spend number.'],
@@ -1462,6 +1499,7 @@ async function nativeSync() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
+  if (Date.now() - swallowClick < 450) { e.preventDefault(); return; }
   const t = e.target.closest('button, [data-tab]'); if (!t) return;
   if (t.dataset.tab) { go(t.dataset.tab); return; }
   if (buddyClick(t) || pcClick(t)) return;
@@ -1478,8 +1516,15 @@ document.addEventListener('click', e => {
     if (draft.cat && parseFloat(draft.amtStr)) { const b = $('[data-act="savetx"]'); if (b) b.classList.add('pulse'); }
     return;
   }
+  if (t.dataset.quick !== undefined && draft) {
+    const q = (draft.picks || [])[+t.dataset.quick]; if (!q) return;
+    tick(10); syncDraftInputs(); draft.amtStr = String(q.amt); draft.cat = q.cat; if (!draft.note) draft.note = q.note;
+    renderAdd(); bumpEl($('#sheet .amount .val'), 'bump'); const b = $('[data-act="savetx"]'); if (b) b.classList.add('pulse');
+    return;
+  }
   if (t.dataset.dir && draft) { syncDraftInputs(); if (draft.dir !== t.dataset.dir) { draft.dir = t.dataset.dir; draft.cat = ''; draft.split = 1; } renderAdd(); return; }
   if (t.dataset.mode && draft) { syncDraftInputs(); draft.mode = t.dataset.mode; renderAdd(); return; }
+  if (t.dataset.ins) { insOff = Math.max(0, insOff + +t.dataset.ins); tick(6); render(true); return; }
   if (t.dataset.hview) { histView = t.dataset.hview; render(true); return; }
   if (t.dataset.hcat !== undefined) { histCat = t.dataset.hcat; render(); return; }
   if (t.dataset.tog) { toggleSetting(t.dataset.tog); return; }
@@ -1520,7 +1565,8 @@ document.addEventListener('click', e => {
       break;
     }
     case 'addmore': syncDraftInputs(); draft.more = true; renderAdd(); break;
-    case 'gotoins': histView = 'insights'; go('history'); break;
+    case 'gotoins': histView = 'insights'; insOff = 0; go('history'); break;
+    case 'catgo': histView = 'list'; histFilter = 'month'; histCat = id; histQuery = ''; go('history'); break;
     case 'splitcycle': syncDraftInputs(); draft.split = draft.split >= 6 ? 1 : (draft.split || 1) + 1; renderAdd(); break;
     case 'attach': syncDraftInputs(); attachPhoto(); break;
     case 'viewphoto': showPhoto(draft.id, () => { draft.photo = false; renderAdd(); }); break;
@@ -1584,7 +1630,7 @@ document.addEventListener('click', e => {
       let sub = S.subs.find(x => x.id === id); const fresh = !sub;
       if (!sub) { sub = { id }; S.subs.push(sub); }
       Object.assign(sub, { name, amt, day: +$('#s-day').value, cat: $('#s-cat').value });
-      if (fresh) sub.last = dueDate(sub, new Date()) <= new Date() ? monthKey(new Date()) : '';   // no backfill for a day already gone this month
+      if (fresh) { sub.since = Date.now(); sub.last = dueDate(sub, new Date()) <= new Date() ? monthKey(new Date()) : ''; }   // no backfill for a day already gone this month
       save(); closeSheet(); render(); break;
     }
     case 'subdel': S.subs = S.subs.filter(x => x.id !== id); save(); closeSheet(); render(); toast('Removed'); break;
@@ -1606,6 +1652,42 @@ document.addEventListener('click', e => {
   }
 });
 $('#scrim').addEventListener('click', closeSheet);
+function deleteRow(id) {
+  const tx = S.tx.find(x => x.id === id), inc = !tx && (S.inc || []).find(x => x.id === id);
+  if (tx) { S.tx = S.tx.filter(x => x.id !== id); save(); render(); tick(20); toast('Deleted ' + money(tx.amt), 5000, { label: 'Undo', fn: () => { if (!S.tx.some(x => x.id === id)) { S.tx.push(tx); markFresh(id); save(); render(); } } }); }
+  else if (inc) { S.inc = S.inc.filter(x => x.id !== id); save(); render(); tick(20); toast('Deleted +' + money(inc.amt), 5000, { label: 'Undo', fn: () => { S.inc.push(inc); markFresh(id); save(); render(); } }); }
+}
+(() => {   // swipe left on an expense row: it follows your finger, past a third it deletes, otherwise it springs back
+  let el = null, x0 = 0, y0 = 0, dx = 0, on = false;
+  document.addEventListener('touchstart', e => {
+    const it = e.target.closest('#app .list button.item[data-act=edit]');
+    el = it && !draft && !it.dataset.id.startsWith('bill-') ? it : null; if (!el) return;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!el) return;
+    const x = e.touches[0].clientX - x0, y = e.touches[0].clientY - y0;
+    if (!on) { if (x < -12 && Math.abs(x) > Math.abs(y) * 1.4) { on = true; el.classList.add('swiping'); } else if (Math.abs(y) > 10 || x > 12) { el = null; return; } else return; }
+    dx = Math.min(0, x + 12); el.style.transform = `translateX(${dx}px)`;
+    const k = Math.min(1, -dx / (el.offsetWidth * .35)); el.style.setProperty('--sw', k);
+    if (k >= 1 && !el.dataset.armed) { el.dataset.armed = '1'; tick(12); } else if (k < 1 && el.dataset.armed) delete el.dataset.armed;
+  }, { passive: true });
+  const end = () => {
+    if (!el) return; const it = el; el = null; if (!on) return;
+    swallowClick = Date.now(); it.classList.remove('swiping'); it.style.removeProperty('--sw');
+    if (it.dataset.armed) { it.classList.add('gone'); setTimeout(() => deleteRow(it.dataset.id), 230); }
+    else it.style.transform = '';
+  };
+  document.addEventListener('touchend', end, { passive: true }); document.addEventListener('touchcancel', end, { passive: true });
+})();
+document.addEventListener('click', e => {   // tap a chart bar to read its amount
+  const b = e.target.closest('[data-tip]'); document.querySelectorAll('.tipbub').forEach(x => x.remove()); if (!b) return;
+  const box = b.parentElement, t = document.createElement('span'); t.className = 'tipbub'; t.textContent = b.dataset.tip;
+  box.appendChild(t); const x = b.offsetLeft + b.offsetWidth / 2, w = t.offsetWidth;
+  t.style.left = Math.max(0, Math.min(box.clientWidth - w, x - w / 2)) + 'px'; t.style.setProperty('--ax', (x - Math.max(0, Math.min(box.clientWidth - w, x - w / 2))) + 'px');
+  b.classList.add('picked'); setTimeout(() => b.classList.remove('picked'), 600); tick(5);
+  clearTimeout(window.__tipT); window.__tipT = setTimeout(() => t.remove(), 2600);
+});
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'histq') { histQuery = t.value; const pos = t.selectionStart; render(); const n = $('#histq'); n.focus(); n.setSelectionRange(pos, pos); return; }
@@ -1661,6 +1743,7 @@ if (IS_APP && Capacitor.Plugins && Capacitor.Plugins.App) {
   Capacitor.Plugins.App.addListener('appUrlOpen', e => openUrl(e.url));
   Capacitor.Plugins.App.addListener('backButton', () => {
     if (window.kharchaWrapped && kharchaWrapped.isOpen()) return;   // wrapped.js closes its player
+    const lb = document.querySelector('.lightbox:not(.out)'); if (lb) { lb.querySelector('[data-lb=close]').click(); return; }
     if ($('#sheet').classList.contains('show')) closeSheet();
     else if (tab !== 'home') go('home');
     else if (Capacitor.Plugins.App.exitApp) Capacitor.Plugins.App.exitApp();

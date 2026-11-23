@@ -73,7 +73,7 @@ function viewBuddy() {
   let h = `<div class="top"><div class="hi">Bill Buddy</div><button class="chip" data-act="bbfriendnew">＋ Friend</button></div>${goalsSeg()}`;
   const square = !t.owed && !t.owe;
   h += `<div class="card hero bbhero"><div class="label">${square ? 'Between you and your friends' : t.owed >= t.owe ? 'Friends owe you' : 'You owe friends'}</div>
-    <div class="big" data-count="${Math.round(square ? 0 : Math.max(t.owed, t.owe))}">${square ? 'All square' : money(Math.max(t.owed, t.owe), { dec: false })}</div>
+    <div class="big"${square ? '' : ` data-count="${Math.round(Math.max(t.owed, t.owe))}"`}>${square ? 'All square' : money(Math.max(t.owed, t.owe), { dec: false })}</div>
     <div class="line">${square ? (S.bills.length ? 'Nobody owes anybody. Nice.' : 'Split a dinner, a cab or a trip. Kharcha keeps score.') : t.owed && t.owe ? `You owe ${money(t.owe, { dec: false })} on the other side` : t.owed ? 'Tap a friend to ask with a UPI link or QR' : 'Tap a friend to pay them by UPI'}</div>
     <button class="btn block bbsplit" data-act="bbnew">＋ Split a bill</button></div>`;
   h += `<h2>Friends</h2><div class="card list">${fr.length ? fr.map(f => { const b = balanceOf(f.id);
@@ -137,6 +137,7 @@ function renderBill(fresh) {
     <div class="card shares">${lines || '<div class="small muted">Pick who was in.</div>'}
       ${bb.mode === 'custom' ? `<div class="small ${Math.abs(left) < .01 ? 'ok' : 'bad'}" id="bb-left" style="margin-top:8px">${Math.abs(left) < .01 ? 'Adds up ✓' : left > 0 ? money(left) + ' left to assign' : money(-left) + ' too much'}</div>` : ''}</div>
     ${bb.people.includes('me') ? togRowBB(myShare) : ''}
+    ${bb.editing ? `<button class="btn block ghost small" data-act="bbshare" style="margin-bottom:8px">📤 Share the breakdown</button>` : ''}
     <div class="actions">${bb.editing ? `<button class="btn danger" data-act="bbdel" data-id="${bb.id}">Delete</button>` : `<button class="btn" data-act="close">Cancel</button>`}<button class="btn primary" data-act="bbsave">${bb.editing ? 'Update' : 'Save bill'}</button></div>`, fresh);
 }
 const togRowBB = mine => `<div class="tog" style="border-top:0"><div class="grow"><div class="bold">Log my share as an expense</div><div class="small muted">${mine ? money(mine) + ' goes into your spending today' : 'Your share counts toward your budget'}${bb.payer !== 'me' ? '. Paying them back later is not counted again.' : ''}</div></div><button class="switch ${bb.log ? 'on' : ''}" data-act="bblog" role="switch" aria-checked="${bb.log}" aria-label="Log my share as an expense"><i></i></button></div>`;
@@ -164,6 +165,16 @@ function saveBill() {
   const others = r2(total - (shares.me || 0));
   toast(bill.payer === 'me' ? `Saved · friends owe you ${money(others)}` : `Saved · you owe ${pname(bill.payer)} ${money(shares.me || 0)}`, 5000,
     { label: 'Undo', fn: () => { S.bills = S.bills.filter(x => x.id !== bill.id); S.tx = S.tx.filter(t => t.id !== txId); save(); render(); toast('Removed'); } });
+}
+
+function billBreakdown(x) {
+  const lines = Object.entries(x.shares).sort((a, b) => (a[0] === 'me') - (b[0] === 'me')).map(([p, v]) => `• ${p === 'me' ? (S.settings.name || 'Me') : pname(p)}: ${money(v)}`);
+  const payer = x.payer === 'me' ? (S.settings.name || 'me') : pname(x.payer);
+  return [`🧾 ${x.title}: ${money(x.amt)}`, ...lines, `Paid by ${payer}.`].concat(x.payer === 'me' && S.settings.upi ? [`UPI: ${S.settings.upi}`] : []).join('\n');
+}
+function shareText(text) {
+  if (navigator.share) return navigator.share({ text }).catch(() => {});
+  copyText(text, 'Breakdown copied. Paste it in the group');
 }
 
 /* ---------- friends ---------- */
@@ -212,7 +223,12 @@ function recordSettle(fid, amt, dir, note) {
   const left = balanceOf(fid);
   toast(Math.abs(left) < .01 ? `Settled up with ${pname(fid)} 🤝` : left > 0 ? `Saved · ${pname(fid)} still owes ${money(left)}` : `Saved · you still owe ${money(-left)}`, 5000,
     { label: 'Undo', fn: () => { S.settles = S.settles.filter(x => x.id !== s.id); save(); render(); if ($('#sheet').classList.contains('show')) friendSheet(fid); } });
-  if (Math.abs(left) < .01) confetti();
+  if (Math.abs(left) < .01) { confetti(); stamp('Settled!'); }
+}
+
+function stamp(text) {
+  const el = document.createElement('div'); el.className = 'stamp'; el.innerHTML = `<b>${esc(text)}</b>`;
+  document.body.appendChild(el); setTimeout(() => el.classList.add('out'), 1100); setTimeout(() => el.remove(), 1500);
 }
 
 /* ---------- ask for money ---------- */
@@ -258,6 +274,7 @@ function buddyClick(t) {
     case 'bbnewwith': billForm(null, { people: [id] }); break;
     case 'bbedit': { const x = S.bills.find(b => b.id === id); if (x) billForm(x); break; }
     case 'bbsave': saveBill(); break;
+    case 'bbshare': { const x = S.bills.find(b => b.id === bb.id); if (x) shareText(billBreakdown(x)); break; }
     case 'bblog': syncBill(); bb.log = !bb.log; tick(8); renderBill(); break;
     case 'bbaddf': syncBill(); bb.adding = true; renderBill(); setTimeout(() => { const i = $('#bb-fname'); if (i) i.focus(); }, 60); break;
     case 'bbaddfsave': { syncBill(); const f = addFriend(($('#bb-fname') || {}).value); if (!f) { toast('Type a name'); break; } if (!bb.people.includes(f.id)) bb.people.push(f.id); bb.adding = false; renderBill(); break; }
